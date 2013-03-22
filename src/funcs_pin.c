@@ -1,19 +1,19 @@
 /**
  * funcs_pin.c
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope t_ it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * Copyright (C) Pim Vullers, Radboud University Nijmegen, May 2012.
  */
 
@@ -27,43 +27,47 @@
 #include "defs_externals.h"
 #include "funcs_debug.h"
 
-// Card holder verification
-Byte pinCode[SIZE_PIN] = { 0x30, 0x30, 0x30, 0x30 };
-Byte pinCount = PIN_COUNT;
-
 /**
  * Verify a PIN code
- * 
+ *
  * @param buffer which contains the code to verify
  */
-void pin_verify(ByteArray buffer) {
+void pin_verify(PIN* pin, ByteArray buffer) {
   // Verify if the PIN has not been blocked
-  if (pinCount == 0) {
+  if (pin->count == 0) {
     ReturnSW(ISO7816_SW_COUNTER_PROVIDED_BY_X(0));
   }
-  
+
   // Compare the PIN with the stored code
-  if (memcmp(buffer, pinCode, SIZE_PIN) != 0) {
+  if (memcmp(buffer, pin->code, SIZE_PIN_MAX) != 0) {
     debugWarning("PIN verification failed");
-    debugInteger("Tries left", pinCount - 1);
-    ReturnSW(ISO7816_SW_COUNTER_PROVIDED_BY_X(0) | --pinCount);
+    debugInteger("Tries left", pin->count - 1);
+    ReturnSW(ISO7816_SW_COUNTER_PROVIDED_BY_X(0) | --(pin->count));
   } else {
     debugMessage("PIN verified ");
-    pinCount = PIN_COUNT;
-    flags |= PIN_OK;
+    pin->count = PIN_COUNT;
+    flags |= pin->flag;
   }
 }
 
 /**
- * Update a PIN code
+ * Modify a PIN code
  *
- * @param buffer which contains the new code
+ * @param buffer which contains the old and new code
  */
-void pin_update(ByteArray buffer) {
-  if (!pin_verified) {
-    ReturnSW(ISO7816_SW_SECURITY_STATUS_NOT_SATISFIED);
-  }
+void pin_update(PIN* pin, ByteArray buffer) {
+  int i;
   
+  // Verify the original PIN
+  pin_verify(pin, buffer);
+
+  // Verify the new PIN size
+  for (i = 0; i < pin->minSize; i++) {
+	  if (buffer[SIZE_PIN_MAX + i] == 0x00) {
+		  ReturnSW(ISO7816_SW_WRONG_LENGTH);
+	  }
+  }
+
   // Store the new code
-  COPYN(SIZE_PIN, pinCode, apdu.data);
+  memcpy(pin->code, buffer + SIZE_PIN_MAX, SIZE_PIN_MAX);
 }
