@@ -1,6 +1,7 @@
-*idemix-0.7-5262d7f (22 March 2012)
+*IRMAcard-0.7-5262d7f (22 March 2012)
 
-Dropped SHA-1 in favour of SHA-256. Reorganised APDU handling to adhere to the specification.
+Dropped SHA-1 in favour of SHA-256. Reorganised APDU handling to adhere to the 
+IRMAcard technical specification.
 
 *idemix-0.6.4-4811e35 (13 March 2013)
 

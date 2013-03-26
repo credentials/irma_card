@@ -23,16 +23,10 @@
 #include <multoscrypto.h>
 #include <string.h>
 
-#include "defs_externals.h"
-#include "funcs_debug.h"
-#include "funcs_helper.h"
+#include "externals.h"
+#include "debug.h"
+#include "encoding.h"
 #include "crypto_multos.h"
-
-#ifdef TEST
-  #include "defs_test.h"
-
-  int m_count = 0;
-#endif // TEST
 
 /********************************************************************/
 /* Cryptographic helper functions                                   */

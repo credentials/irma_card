@@ -20,7 +20,7 @@
 #ifndef __crypto_helper_H
 #define __crypto_helper_H
 
-#include "defs_types.h"
+#include "types.h"
 
 /**
  * Compute a cryptographic hash of the given input values
