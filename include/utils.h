@@ -1,5 +1,5 @@
 /**
- * crypto_helper.h
+ * utils.h
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
  * Copyright (C) Pim Vullers, Radboud University Nijmegen, September 2011.
  */
  
-#ifndef __crypto_helper_H
-#define __crypto_helper_H
+#ifndef __utils_H
+#define __utils_H
 
 #include "types.h"
 
@@ -31,16 +31,8 @@
  * @param buffer which can be used for temporary storage
  * @param size of the buffer
  */
-void crypto_compute_hash(ValueArray list, int length, ByteArray result,
+void ComputeHash(ValueArray list, int length, ByteArray result,
                          ByteArray buffer, int size);
-
-/**
- * Generate a random number in the buffer of size bytes
- * 
- * @param buffer to store the generated random number
- * @param length of the random number to generate
- */
-void crypto_generate_random(ByteArray buffer, int length);
 
 /**
  * Compute the helper value S' = S^(2_l) where l = SIZE_S_EXPONENT*8
@@ -48,7 +40,7 @@ void crypto_generate_random(ByteArray buffer, int length);
  * This value is required for exponentiations with base S and an 
  * exponent which is larger than SIZE_N bytes.
  */
-void crypto_compute_S_(void);
+void ComputeS_(void);
 
 /**
  * Compute the modular exponentiation: result = S^exponent mod n
@@ -60,7 +52,7 @@ void crypto_compute_S_(void);
  * @param exponent the power to which the base S should be raised
  * @param result of the computation
  */
-void crypto_modexp_special(int size, ByteArray exponent, ByteArray result, ByteArray buffer);
+void ModExpSpecial(int size, ByteArray exponent, ByteArray result, ByteArray buffer);
 
 /**
  * Clear size bytes from a bytearray
@@ -68,20 +60,16 @@ void crypto_modexp_special(int size, ByteArray exponent, ByteArray result, ByteA
  * @param size the amount of bytes to clear
  * @param buffer to be cleared
  */
-void crypto_clear(int size, ByteArray buffer);
+void ClearBytes(int size, ByteArray buffer);
 
 /**
  * Clear the current credential.
  */
-void crypto_clear_credential(void);
+void ClearCredential(void);
 
 /**
  * Clear the current session.
  */
-void crypto_clear_session(void);
+void ClearSession(void);
 
-#ifdef SIMULATOR
-#define SHA1_PADDED
-#endif // SIMULATOR
-
-#endif // __crypto_helper_H
+#endif // __utils_H

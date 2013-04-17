@@ -23,9 +23,6 @@
 #pragma attribute("fci", "49 00 07 01")
 
 #include <ISO7816.h> // for APDU constants
-#include <multosarith.h> // for COPYN()
-#include <multosccr.h> // for ZFlag()
-#include <string.h> // for memset()
 
 #include "apdu.h"
 #include "sizes.h"
@@ -33,7 +30,9 @@
 #include "debug.h"
 #include "encoding.h"
 #include "cardholder_verification.h"
-#include "crypto_helper.h"
+#include "utils.h"
+#include "memory.h"
+#include "random.h"
 #include "issuance.h"
 #include "verification.h"
 #include "secure_messaging.h"
@@ -217,22 +216,21 @@ void main(void) {
           }
 
           // Prevent reinitialisation of the master secret
-          TESTN(SIZE_M, masterSecret);
-          ZFlag(&flag);
+          TestZero(SIZE_M, masterSecret, flag);
           if (flag == 0) {
             debugWarning("Master secret is already generated");
             ReturnSW(ISO7816_SW_COMMAND_NOT_ALLOWED_AGAIN);
           }
 
           // Generate a random value for the master secret
-          crypto_generate_random(masterSecret, LENGTH_M);
+          RandomBits(masterSecret, LENGTH_M);
 #else // TEST
           if (!((wrapped || CheckCase(3)) && Lc == SIZE_M)) {
             ReturnSW(ISO7816_SW_WRONG_LENGTH);
           }
 
           // Use the test value for the master secret
-          COPYN(SIZE_M, masterSecret, public.apdu.data);
+          Copy(SIZE_M, masterSecret, public.apdu.data);
 #endif // TEST
           debugValue("Initialised master secret", masterSecret, SIZE_M);
           ReturnSW(ISO7816_SW_NO_ERROR);
@@ -249,7 +247,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-              COPYN(SIZE_RSA_EXPONENT, rsaExponent, public.apdu.data);
+              Copy(SIZE_RSA_EXPONENT, rsaExponent, public.apdu.data);
               debugValue("Initialised rsaExponent", rsaExponent, SIZE_RSA_EXPONENT);
               break;
 
@@ -259,7 +257,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-              COPYN(SIZE_RSA_EXPONENT, rsaModulus, public.apdu.data);
+              Copy(SIZE_RSA_EXPONENT, rsaModulus, public.apdu.data);
               debugValue("Initialised rsaModulus", rsaModulus, SIZE_RSA_MODULUS);
               break;
 
@@ -302,13 +300,13 @@ void main(void) {
               credential->id = public.issuanceSetup.id;
               credential->size = public.issuanceSetup.size;
               credential->issuerFlags = public.issuanceSetup.flags;
-              COPYN(SIZE_H, credential->proof.context, public.issuanceSetup.context);
+              Copy(SIZE_H, credential->proof.context, public.issuanceSetup.context);
               debugHash("Initialised context", credential->proof.context);
 
               // Create new log entry
               log_new_entry();
-              COPYN(SIZE_TIMESTAMP, log->timestamp, public.issuanceSetup.timestamp);
-              COPYN(SIZE_TERMINAL_ID, log->terminal, terminal);
+              Copy(SIZE_TIMESTAMP, log->timestamp, public.issuanceSetup.timestamp);
+              Copy(SIZE_TERMINAL_ID, log->terminal, terminal);
               log->action = ACTION_ISSUE;
               log->credential = credential->id;
 
@@ -335,21 +333,21 @@ void main(void) {
           switch (P1) {
             case P1_PUBLIC_KEY_N:
               debugMessage("P1_PUBLIC_KEY_N");
-              COPYN(SIZE_N, credential->issuerKey.n, public.apdu.data);
+              Copy(SIZE_N, credential->issuerKey.n, public.apdu.data);
               debugNumber("Initialised isserKey.n", credential->issuerKey.n);
               break;
 
             case P1_PUBLIC_KEY_Z:
               debugMessage("P1_PUBLIC_KEY_Z");
-              COPYN(SIZE_N, credential->issuerKey.Z, public.apdu.data);
+              Copy(SIZE_N, credential->issuerKey.Z, public.apdu.data);
               debugNumber("Initialised isserKey.Z", credential->issuerKey.Z);
               break;
 
             case P1_PUBLIC_KEY_S:
               debugMessage("P1_PUBLIC_KEY_S");
-              COPYN(SIZE_N, credential->issuerKey.S, public.apdu.data);
+              Copy(SIZE_N, credential->issuerKey.S, public.apdu.data);
               debugNumber("Initialised isserKey.S", credential->issuerKey.S);
-              crypto_compute_S_();
+              ComputeS_();
               debugNumber("Initialised isserKey.S_", credential->issuerKey.S_);
               break;
 
@@ -358,7 +356,7 @@ void main(void) {
               if (P2 > MAX_ATTR) {
                 ReturnSW(ISO7816_SW_WRONG_P1P2);
               }
-              COPYN(SIZE_N, credential->issuerKey.R[P2], public.apdu.data);
+              Copy(SIZE_N, credential->issuerKey.R[P2], public.apdu.data);
               debugNumberI("Initialised isserKey.R", credential->issuerKey.R, P2);
               break;
 
@@ -382,14 +380,13 @@ void main(void) {
           if (P1 == 0 || P1 > credential->size) {
             ReturnSW(ISO7816_SW_WRONG_P1P2);
           }
-          TESTN(SIZE_M, public.apdu.data);
-          ZFlag(&flag);
+          TestZero(SIZE_M, public.apdu.data, flag);
           if (flag != 0) {
             debugWarning("Attribute cannot be empty");
             ReturnSW(ISO7816_SW_WRONG_DATA);
           }
 
-          COPYN(SIZE_M, credential->attribute[P1 - 1], public.apdu.data);
+          Copy(SIZE_M, credential->attribute[P1 - 1], public.apdu.data);
           debugCLMessageI("Initialised attribute", credential->attribute, P1 - 1);
           ReturnSW(ISO7816_SW_NO_ERROR);
 
@@ -405,7 +402,7 @@ void main(void) {
             ReturnSW(ISO7816_SW_WRONG_LENGTH);
           }
 
-          COPYN(SIZE_STATZK, public.issue.nonce, public.apdu.data);
+          Copy(SIZE_STATZK, public.issue.nonce, public.apdu.data);
           debugNonce("Initialised nonce", public.issue.nonce);
           constructCommitment();
           debugNumber("Returned U", public.apdu.data);
@@ -426,19 +423,19 @@ void main(void) {
           switch (P1) {
             case P1_PROOF_C:
               debugMessage("P1_COMMITMENT_PROOF_C");
-              COPYN(SIZE_H, public.apdu.data, session.issue.challenge);
+              Copy(SIZE_H, public.apdu.data, session.issue.challenge);
               debugHash("Returned c", public.apdu.data);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_H);
 
             case P1_PROOF_VPRIMEHAT:
               debugMessage("P1_COMMITMENT_PROOF_VPRIMEHAT");
-              COPYN(SIZE_VPRIME_, public.apdu.data, session.issue.vPrimeHat);
+              Copy(SIZE_VPRIME_, public.apdu.data, session.issue.vPrimeHat);
               debugValue("Returned vPrimeHat", public.apdu.data, SIZE_VPRIME_);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_VPRIME_);
 
             case P1_PROOF_SHAT:
               debugMessage("P1_COMMITMENT_PROOF_SHAT");
-              COPYN(SIZE_S_, public.apdu.data, session.issue.sHat);
+              Copy(SIZE_S_, public.apdu.data, session.issue.sHat);
               debugValue("Returned s_A", public.apdu.data, SIZE_S_);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_S_);
 
@@ -459,7 +456,7 @@ void main(void) {
             ReturnSW(ISO7816_SW_WRONG_LENGTH);
           }
 
-          COPYN(SIZE_STATZK, public.apdu.data, credential->proof.nonce);
+          Copy(SIZE_STATZK, public.apdu.data, credential->proof.nonce);
           debugNonce("Returned nonce", public.apdu.data);
           ReturnLa(ISO7816_SW_NO_ERROR, SIZE_STATZK);
 
@@ -479,7 +476,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-              COPYN(SIZE_N, credential->signature.A, public.apdu.data);
+              Copy(SIZE_N, credential->signature.A, public.apdu.data);
               debugNumber("Initialised signature.A", credential->signature.A);
               break;
 
@@ -489,7 +486,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-              COPYN(SIZE_E, credential->signature.e, public.apdu.data);
+              Copy(SIZE_E, credential->signature.e, public.apdu.data);
               debugValue("Initialised signature.e", credential->signature.e, SIZE_E);
               break;
 
@@ -535,7 +532,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-              COPYN(SIZE_H, credential->proof.challenge, public.apdu.data);
+              Copy(SIZE_H, credential->proof.challenge, public.apdu.data);
               debugHash("Initialised c", credential->proof.challenge);
               break;
 
@@ -545,7 +542,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-              COPYN(SIZE_N, credential->proof.response, public.apdu.data);
+              Copy(SIZE_N, credential->proof.response, public.apdu.data);
               debugNumber("Initialised s_e", credential->proof.response);
               break;
 
@@ -580,7 +577,7 @@ void main(void) {
           }
 
           // FIXME: should be done during auth.
-          COPYN(SIZE_TERMINAL_ID, terminal, public.verificationSetup.terminal);
+          Copy(SIZE_TERMINAL_ID, terminal, public.verificationSetup.terminal);
 
           // Lookup the given credential ID and select it if it exists
           for (i = 0; i < MAX_CRED; i++) {
@@ -595,17 +592,17 @@ void main(void) {
               }
 
 #ifndef SIMULATOR
-              COPYN(SIZE_H, public.prove.context, public.verificationSetup.context);
+              Copy(SIZE_H, public.prove.context, public.verificationSetup.context);
               debugHash("Initialised context", public.prove.context);
 #else // SIMULATOR
-              COPYN(SIZE_H, session.prove.context, public.verificationSetup.context);
+              Copy(SIZE_H, session.prove.context, public.verificationSetup.context);
               debugHash("Initialised context", session.prove.context);
 #endif // SIMULATOR
 
               // Create new log entry
               log_new_entry();
-              COPYN(SIZE_TIMESTAMP, log->timestamp, public.verificationSetup.timestamp);
-              COPYN(SIZE_TERMINAL_ID, log->terminal, terminal);
+              Copy(SIZE_TIMESTAMP, log->timestamp, public.verificationSetup.timestamp);
+              Copy(SIZE_TERMINAL_ID, log->terminal, terminal);
               log->action = ACTION_PROVE;
               log->credential = credential->id;
 
@@ -647,9 +644,9 @@ void main(void) {
               }
 
 #ifndef SIMULATOR
-              COPYN(SIZE_N, public.apdu.data, public.prove.APrime);
+              Copy(SIZE_N, public.apdu.data, public.prove.APrime);
 #else // SIMULATOR
-              COPYN(SIZE_N, public.apdu.data, session.prove.APrime);
+              Copy(SIZE_N, public.apdu.data, session.prove.APrime);
 #endif // SIMULATOR
               debugNumber("Returned A'", public.apdu.data);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_N);
@@ -661,9 +658,9 @@ void main(void) {
               }
 
 #ifndef SIMULATOR
-              COPYN(SIZE_E_, public.apdu.data, public.prove.eHat);
+              Copy(SIZE_E_, public.apdu.data, public.prove.eHat);
 #else // SIMULATOR
-              COPYN(SIZE_E_, public.apdu.data, session.prove.eHat);
+              Copy(SIZE_E_, public.apdu.data, session.prove.eHat);
 #endif // SIMULATOR
               debugValue("Returned e^", public.apdu.data, SIZE_E_);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_E_);
@@ -675,9 +672,9 @@ void main(void) {
               }
 
 #ifndef SIMULATOR
-              COPYN(SIZE_V_, public.apdu.data, public.prove.vHat);
+              Copy(SIZE_V_, public.apdu.data, public.prove.vHat);
 #else // SIMULATOR
-              COPYN(SIZE_V_, public.apdu.data, session.prove.vHat);
+              Copy(SIZE_V_, public.apdu.data, session.prove.vHat);
 #endif // SIMULATOR
               debugValue("Returned v^", public.apdu.data, SIZE_V_);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_V_);
@@ -703,11 +700,11 @@ void main(void) {
           }
 
           if (disclosed(P1)) {
-            COPYN(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
+            Copy(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
             debugValue("Returned attribute", public.apdu.data, SIZE_M);
             ReturnLa(ISO7816_SW_NO_ERROR, SIZE_M);
           } else {
-            COPYN(SIZE_M_, public.apdu.data, session.prove.mHat[P1]);
+            Copy(SIZE_M_, public.apdu.data, session.prove.mHat[P1]);
             debugValue("Returned response", public.apdu.data, SIZE_M_);
             ReturnLa(ISO7816_SW_NO_ERROR, SIZE_M_);
           }
@@ -770,7 +767,7 @@ void main(void) {
             ReturnSW(ISO7816_SW_WRONG_P1P2);
           }
 
-          COPYN(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
+          Copy(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
           debugValue("Returned attribute", public.apdu.data, SIZE_M);
           ReturnLa(ISO7816_SW_NO_ERROR, SIZE_M);
           break;
@@ -793,13 +790,13 @@ void main(void) {
 
           // Verify the given credential ID and remove it if it matches
           if (credential->id == P1P2) {
-            crypto_clear_credential();
+            ClearCredential();
             debugInteger("Removed credential", P1P2);
 
             // Create new log entry
             log_new_entry();
-            COPYN(SIZE_TIMESTAMP, log->timestamp, public.apdu.data);
-            COPYN(SIZE_TERMINAL_ID, log->terminal, terminal);
+            Copy(SIZE_TIMESTAMP, log->timestamp, public.apdu.data);
+            Copy(SIZE_TERMINAL_ID, log->terminal, terminal);
             log->action = ACTION_REMOVE;
             log->credential = P1P2;
 

@@ -29,6 +29,6 @@ $(SMARTCARD): $(HEADERS) $(SOURCES) $(BINDIR)
 	hcl $(CARDFLAGS) $(SOURCES) -o $(SMARTCARD)
 
 clean:
-	rm -f $(BINDIR) $(SRCDIR)/*~ $(INCDIR)/*~ 
+	rm -rf $(BINDIR) $(SRCDIR)/*~ $(INCDIR)/*~
 
 .PHONY: all clean simulator smartcard

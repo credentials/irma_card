@@ -1,5 +1,5 @@
 /**
- * crypto_messaging.c
+ * secure_messaging.c
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,15 +21,14 @@
 
 #include <DES.h>
 #include <ISO7816.h>
-#include <multosarith.h>
 #include <multoscrypto.h>
-#include <string.h>
 
 #include "apdu.h"
 #include "externals.h"
 #include "debug.h"
-#include "crypto_helper.h"
-#include "crypto_multos.h"
+#include "utils.h"
+#include "memory.h"
+#include "arithmetic.h"
 
 /********************************************************************/
 /* Secure Messaging functions                                       */
@@ -48,7 +47,7 @@ void crypto_unwrap(void) {
   int do87Data_p = 0;
   int do87LenBytes = 0;
 
-  INCN(SIZE_SSC, ssc);
+  Increment(SIZE_SSC, ssc);
 
   if (buffer[offset] == 0x87) { // do87
     if (buffer[++offset] > 0x80) {
@@ -84,7 +83,7 @@ void crypto_unwrap(void) {
   i = 0;
 
   // SSC
-  COPYN(SIZE_SSC, tmp, ssc);
+  Copy(SIZE_SSC, tmp, ssc);
   i += SIZE_SSC;
 
   // Header
@@ -97,7 +96,7 @@ void crypto_unwrap(void) {
   i = pad(tmp, i);
 
   // Cryptogram (do87 and do97)
-  memcpy(tmp + i, buffer, offset);
+  CopyBytes(offset, tmp + i, buffer);
   do87Data_p += i;
   i += offset;
 
@@ -106,7 +105,7 @@ void crypto_unwrap(void) {
 
   // Verify the MAC
   GenerateTripleDESCBCSignature(i, iv, key_mac, mac, tmp);
-  if (memcmp(mac, buffer + offset + 2, SIZE_MAC) != 0) {
+  if (Compare(SIZE_MAC, mac, buffer + offset + 2) != 0) {
     ExitSW(ISO7816_SW_CONDITIONS_NOT_SATISFIED);
   }
 
@@ -133,7 +132,7 @@ void crypto_unwrap(void) {
 void crypto_wrap(void) {
   int i, offset = 0;
 
-  INCN(SIZE_SSC, ssc);
+  Increment(SIZE_SSC, ssc);
 
   if(hasDo87) {
     // Padding
@@ -166,7 +165,7 @@ void crypto_wrap(void) {
   i = pad(tmp, offset);
 
   // calculate and write mac
-  COPYN(SIZE_SSC, tmp - SIZE_SSC, ssc);
+  Copy(SIZE_SSC, tmp - SIZE_SSC, ssc);
   GenerateTripleDESCBCSignature(i + SIZE_SSC, iv, key_mac, buffer + offset + 2, tmp - SIZE_SSC);
 
   // write do8e
@@ -175,7 +174,7 @@ void crypto_wrap(void) {
   La = offset + 8; // for mac written earlier
 
   // Put it all in the buffer (the mac is already there)
-  memcpy(buffer, tmp, offset);
+  CopyBytes(offset, buffer, tmp);
 }
 #undef buffer
 #undef tmp
@@ -190,7 +189,7 @@ void crypto_wrap(void) {
  * @param size of the data that needs to be padded
  * @return the new size of the data including padding
  */
-uint pad(ByteArray in, int length) {
+unsigned int pad(ByteArray in, int length) {
   in[length++] = 0x80;
   while (length % 8 != 0) {
     in[length++] = 0x00;
@@ -213,66 +212,3 @@ uint unpad(ByteArray in, int length) {
   }
   return length;
 }
-
-/**
- * Derive session key from a given key seed and mode
- *
- * @param key to be stored
- * @param mode for which a key needs to be derived
- */
-#define seed public.apdu.data
-void deriveSessionKey(ByteArray key, Byte mode) {
-  int i, j, bits;
-
-  // Derive the session key for mode
-  seed[SIZE_KEY_SEED + 3] = mode;
-  SHA1(SIZE_KEY_SEED + 4, key, seed);
-
-  // Compute the parity bits
-  for (i = 0; i < SIZE_KEY; i++) {
-    for (j = 0, bits = 0; j < 8; j++) {
-      bits += (key[i] >> j) & 0x01;
-    }
-    if (bits % 2 == 0) {
-      key[i] ^= 0x01;
-    }
-  }
-}
-#undef seed
-
-/**
- * Derive session keys from a given key seed
- */
-#define seed public.apdu.data
-void crypto_derive_sessionkeys(void) {
-  // Clear the seed suffix such that we can add a mode specific part
-  CLEARN(4, seed + SIZE_KEY_SEED);
-
-  // Derive the session key for encryption
-  deriveSessionKey(seed + SIZE_KEY_SEED + 4, 0x01);
-  COPYN(SIZE_KEY, key_enc, seed + SIZE_KEY_SEED + 4);
-  COPYN(4, ssc, seed + SIZE_KEY_SEED + 4 + SIZE_KEY);
-
-  // Derive the session key for authentication
-  deriveSessionKey(seed + SIZE_KEY_SEED + 4, 0x02);
-  COPYN(SIZE_KEY, key_mac, seed + SIZE_KEY_SEED + 4);
-  COPYN(4, ssc + 4, seed + SIZE_KEY_SEED + 4 + SIZE_KEY);
-}
-#undef seed
-
-#define buffer public.apdu.data
-void crypto_authenticate_card(void) {
-  // Decrypt the session key seed input from the terminal
-  crypto_modexp_secure(SIZE_RSA_EXPONENT, SIZE_RSA_MODULUS,
-    rsaExponent, rsaModulus, buffer, buffer + SIZE_RSA_MODULUS);
-
-  // Generate the session key seed input from the card
-  crypto_generate_random(buffer, LENGTH_KEY_SEED_CARD);
-
-  // Derive the session keys
-  crypto_derive_sessionkeys();
-
-  // Clean up intermediate results
-  CLEARN(SIZE_KEY_SEED_TERMINAL + 4 + SIZE_H, buffer + SIZE_KEY_SEED_CARD);
-}
-#undef buffer

@@ -20,12 +20,11 @@
 #include "cardholder_verification.h"
 
 #include <ISO7816.h>
-#include <multosarith.h>
-#include <string.h>
 
 #include "apdu.h"
 #include "externals.h"
 #include "debug.h"
+#include "memory.h"
 
 /**
  * Verify a PIN code
@@ -69,5 +68,5 @@ void pin_update(PIN* pin, ByteArray buffer) {
   }
 
   // Store the new code
-  memcpy(pin->code, buffer + SIZE_PIN_MAX, SIZE_PIN_MAX);
+  CopyBytes(SIZE_PIN_MAX, pin->code, buffer + SIZE_PIN_MAX);
 }

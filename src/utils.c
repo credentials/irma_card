@@ -1,5 +1,5 @@
 /**
- * crypto_helper.c
+ * utils.c
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,16 +17,15 @@
  * Copyright (C) Pim Vullers, Radboud University Nijmegen, September 2011.
  */
 
-#include "crypto_helper.h"
-
-#include <multosarith.h>
-#include <multoscrypto.h>
-#include <string.h>
+#include "utils.h"
 
 #include "externals.h"
 #include "debug.h"
+#include "types.h"
+#include "SHA.h"
 #include "encoding.h"
-#include "crypto_multos.h"
+#include "memory.h"
+#include "arithmetic.h"
 
 /********************************************************************/
 /* Cryptographic helper functions                                   */
@@ -45,7 +44,7 @@
  * @param buffer which can be used for temporary storage
  * @param size of the buffer
  */
-void crypto_compute_hash(ValueArray list, int length, ByteArray result,
+void ComputeHash(ValueArray list, int length, ByteArray result,
                          ByteArray buffer, int size) {
   int i, offset = size;
 
@@ -62,92 +61,7 @@ void crypto_compute_hash(ValueArray list, int length, ByteArray result,
 
   // Hash the data
   debugValue("asn1rep", buffer + offset, size - offset);
-#ifndef SHA1_PADDED
-  SHA256(size - offset, result, buffer + offset);
-#else // SHA1_PADDED
-  for (i = 0; i < SIZE_H; i++) {
-	  result[i] = i;
-  }
-  SHA1(size - offset, result, buffer + offset);
-#endif // SHA1_PADDED
-}
-
-/**
- * Generate a random number in the buffer of length bits
- *
- * @param buffer to store the generated random number
- * @param length in bits of the random number to generate
- */
-void crypto_generate_random(ByteArray buffer, int length) {
-#ifndef TEST
-  Byte number[8];
-  buffer += ((length + 7) / 8);
-
-  // Generate the random number in blocks of eight bytes (64 bits)
-  while (length >= 64) {
-    buffer -= 8;
-    __push(buffer);
-    __code(PRIM, PRIM_RANDOM);
-    __code(STOREI, 8);
-    length -= 64;
-  }
-
-  // Generate the remaining few bytes/bits
-  if (length > 0) {
-    buffer -= (length + 7) / 8;
-    GetRandomNumber(number);
-    number[0] &= 0xFF >> ((64 - length) % 8);
-    memcpy(buffer, number, (length + 7) / 8);
-  }
-
-#else // TEST
-
-  // Copy a test value instead of generating a random
-  switch (length) {
-    case LENGTH_VPRIME:
-      memcpy(buffer, TEST_vPrime, SIZE_VPRIME);
-      break;
-    case LENGTH_R_A - 7:
-      memcpy(buffer, TEST_r_A, SIZE_R_A);
-      break;
-    case LENGTH_VPRIME_:
-      memcpy(buffer, TEST_vPrime_, SIZE_VPRIME_);
-      break;
-    case LENGTH_S_A:
-      memcpy(buffer, TEST_m_, SIZE_S_A);
-      break;
-    case LENGTH_STATZK:
-      memcpy(buffer, TEST_n_2, SIZE_STATZK);
-      break;
-    case LENGTH_M_:
-      switch (m_count % 4) {
-        case 0:
-          memcpy(buffer, TEST_m_0, SIZE_M_);
-          break;
-        case 1:
-          memcpy(buffer, TEST_m_1, SIZE_M_);
-          break;
-        case 2:
-          memcpy(buffer, TEST_m_2, SIZE_M_);
-          break;
-        case 3:
-          memcpy(buffer, TEST_m_3, SIZE_M_);
-          break;
-        default:
-          break;
-      }
-      m_count++;
-      break;
-    case LENGTH_E_:
-      memcpy(buffer, TEST_e_, SIZE_E_);
-      break;
-    case LENGTH_V_:
-      memcpy(buffer, TEST_v_, SIZE_V_);
-      break;
-    default:
-      break;
-  }
-#endif // TEST
+  SHA(SHA_256, result, size - offset, buffer + offset);
 }
 
 /**
@@ -156,14 +70,14 @@ void crypto_generate_random(ByteArray buffer, int length) {
  * This value is required for exponentiations with base S and an
  * exponent which is larger than SIZE_N bytes.
  */
-void crypto_compute_S_(void) {
+void ComputeS_(void) {
   // Store the value l = SIZE_S_EXPONENT*8 in the buffer
-  memset(public.issue.buffer.data, 0xFF, SIZE_S_EXPONENT);
+  Fill(SIZE_S_EXPONENT, public.issue.buffer.data, 0xFF);
 
   // Compute S_ = S^(2_l)
-  crypto_modexp(SIZE_S_EXPONENT, SIZE_N, public.issue.buffer.data,
+  ModExp(SIZE_S_EXPONENT, SIZE_N, public.issue.buffer.data,
     credential->issuerKey.n, credential->issuerKey.S, credential->issuerKey.S_);
-  crypto_modmul(SIZE_N, credential->issuerKey.S_, credential->issuerKey.S, 
+  ModMul(SIZE_N, credential->issuerKey.S_, credential->issuerKey.S, 
     credential->issuerKey.n);
 }
 
@@ -177,17 +91,17 @@ void crypto_compute_S_(void) {
  * @param exponent the power to which the base S should be raised
  * @param result of the computation
  */
-void crypto_modexp_special(int size, ByteArray exponent, ByteArray result, ByteArray buffer) {
+void ModExpSpecial(int size, ByteArray exponent, ByteArray result, ByteArray buffer) {
   if (size > SIZE_N) {
     // Compute result = S^(exponent_bottom) * S_^(exponent_top)
-    crypto_modexp(SIZE_S_EXPONENT, SIZE_N, exponent + size - SIZE_S_EXPONENT,
+    ModExp(SIZE_S_EXPONENT, SIZE_N, exponent + size - SIZE_S_EXPONENT,
       credential->issuerKey.n, credential->issuerKey.S, result);
-    crypto_modexp(size - SIZE_S_EXPONENT, SIZE_N,
+    ModExp(size - SIZE_S_EXPONENT, SIZE_N,
       exponent, credential->issuerKey.n, credential->issuerKey.S_, buffer);
-    crypto_modmul(SIZE_N, result, buffer, credential->issuerKey.n);
+    ModMul(SIZE_N, result, buffer, credential->issuerKey.n);
   } else {
     // Compute result = S^exponent
-    crypto_modexp(size, SIZE_N,
+    ModExp(size, SIZE_N,
       exponent, credential->issuerKey.n, credential->issuerKey.S, result);
   }
 }
@@ -198,7 +112,7 @@ void crypto_modexp_special(int size, ByteArray exponent, ByteArray result, ByteA
  * @param size the amount of bytes to clear
  * @param buffer to be cleared
  */
-void crypto_clear(int size, ByteArray buffer) {
+void ClearBytes(int size, ByteArray buffer) {
   while (size > 255) {
     __push(buffer);
     __code(PUSHZ, 255);
@@ -206,13 +120,13 @@ void crypto_clear(int size, ByteArray buffer) {
     buffer += 255;
     size -= 255;
   }
-  memset(buffer, 0x00, size);
+  Fill(size, buffer, 0x00);
 }
 
 /**
  * Clear the current credential.
  */
-void crypto_clear_credential(void) {
+void ClearCredential(void) {
   Byte i;
 
   // Put the address of the credential on the stack
@@ -245,11 +159,11 @@ void crypto_clear_credential(void) {
 /**
  * Clear the current session.
  */
-void crypto_clear_session(void) {
-  CLEARN(255, session.base);
-  CLEARN(sizeof(SessionData) % 255, session.base + 255);
-  CLEARN(255, public.base);
-  CLEARN(255, public.base + 255);
-  CLEARN(255, public.base + 255*2);
-  CLEARN(sizeof(PublicData) % 255, public.base + 255*3);
+void ClearSession(void) {
+  Clear(255, session.base);
+  Clear(sizeof(SessionData) % 255, session.base + 255);
+  Clear(255, public.base);
+  Clear(255, public.base + 255);
+  Clear(255, public.base + 255*2);
+  Clear(sizeof(PublicData) % 255, public.base + 255*3);
 }

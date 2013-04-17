@@ -29,10 +29,10 @@ void debugWarning(String warning);
 void debugError(String error);
 
 void debugInteger(String label, int value);
-void debugPointer(String label, ByteArray value);
+void debugPointer(String label, const unsigned char *value);
 
-void debugValue(String label, ByteArray value, int length);
-void debugValues(String label, ByteArray value, int length, int count);
+void debugValue(String label, const unsigned char *value, int length);
+void debugValues(String label, const unsigned char *value, int length, int count);
 
 void debugNumberI(String label, Numbers value, int index);
 void debugNumbers(String label, Numbers value, int count);

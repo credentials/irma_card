@@ -32,33 +32,39 @@
   #define RSA_SHA_BITS SHA_256_BITS
 #endif // !RSA_SHA_BITS
 
+#ifndef RSA_SALT_BITS
+  #define RSA_SALT_BITS SHA_256_BITS
+#endif // !RSA_SALT_BITS
+
 #define RSA_BITS_TO_BYTES(bits) ((bits + 7) /8)
 
 #define RSA_EXP_BYTES RSA_BITS_TO_BYTES(RSA_EXP_BITS)
 #define RSA_MOD_BYTES RSA_BITS_TO_BYTES(RSA_MOD_BITS)
 #define RSA_SHA_BYTES RSA_BITS_TO_BYTES(RSA_SHA_BITS)
-
-#include "types.h"
+#define RSA_SALT_BYTES RSA_BITS_TO_BYTES(RSA_SALT_BITS)
 
 typedef struct {
-  Byte modulus[RSA_MOD_BYTES];
-  Byte exponent[RSA_EXP_BYTES];
+  unsigned char modulus[RSA_MOD_BYTES];
+  unsigned char exponent[RSA_EXP_BYTES];
 } RSA_key;
 
 typedef RSA_key RSA_public_key;
 typedef RSA_key RSA_private_key;
 
-int RSA_RAW_encrypt(ByteArray ciphertext, RSA_public_key *key, 
-        unsigned int plaintext_bytes, ByteArray plaintext);
+int RSA_RAW_encrypt(unsigned char *ciphertext, const RSA_public_key *key, 
+        unsigned int plaintext_bytes, const unsigned char *plaintext);
 
-int RSA_RAW_decrypt(ByteArray plaintext, RSA_private_key *key, 
-        unsigned int ciphertext_bytes, ByteArray ciphertext);
+int RSA_RAW_decrypt(unsigned char *plaintext, const RSA_private_key *key, 
+        unsigned int ciphertext_bytes, const unsigned char *ciphertext);
 
 #define RSA_RAW_sign(plaintext, key, ciphertext_bytes, ciphertext) \
   RSA_RAW_decrypt((plaintext), (key), (ciphertext_bytes), (ciphertext))
 
 #define RSA_RAW_verify(ciphertext, key, plaintext_bytes, plaintext) \
   RSA_RAW_encrypt((ciphertext), (key), (plaintext_bytes), (plaintext))
+
+#define RSA_ERROR_ENCRYPTION -1
+#define RSA_ERROR_DECRYPTION -2
 
 /**
  * RSA encryption using OAEP encoding (as specified by PKCS #1)
@@ -71,9 +77,9 @@ int RSA_RAW_decrypt(ByteArray plaintext, RSA_private_key *key,
  * @param plaintext to be transformed into a ciphertext.
  * @return number of bytes written to ciphertext.
  */
-int RSA_OAEP_encrypt(ByteArray ciphertext, RSA_public_key *key, 
-        unsigned int plaintext_bytes, ByteArray plaintext,
-        unsigned int label_bytes, ByteArray label);
+int RSA_OAEP_encrypt(unsigned char *ciphertext, const RSA_public_key *key, 
+        unsigned int plaintext_bytes, const unsigned char *plaintext,
+        unsigned int label_bytes, const unsigned char *label);
 
 /**
  * RSA decryption using OAEP decoding (as specified by PKCS #1)
@@ -88,46 +94,54 @@ int RSA_OAEP_encrypt(ByteArray ciphertext, RSA_public_key *key,
  * @param ciphertext to be transformed into a plaintext.
  * @return number of bytes written to plaintext.
  */
-int RSA_OAEP_decrypt(ByteArray plaintext, RSA_private_key *key, 
-        unsigned int ciphertext_bytes, ByteArray ciphertext, 
-        unsigned int label_bytes, ByteArray label);
+int RSA_OAEP_decrypt(unsigned char *plaintext, const RSA_private_key *key, 
+        unsigned int ciphertext_bytes, unsigned char *ciphertext, 
+        unsigned int label_bytes, const unsigned char *label);
 
 /**
  * PKCS #1 OAEP encoding
  */
-void OAEP_encode(ByteArray encoded, 
-        unsigned int message_bytes, ByteArray message, 
-        unsigned int label_bytes, ByteArray label);
+int OAEP_encode(unsigned char *encoded, 
+        unsigned int message_bytes, const unsigned char *message, 
+        unsigned int label_bytes, const unsigned char *label);
 
 /**
  * PKCS #1 OAEP decoding
  */
-void OAEP_decode(ByteArray message, 
-        unsigned int encoded_bytes, ByteArray encoded, 
-        unsigned int label_bytes, ByteArray label);
+int OAEP_decode(unsigned char *message, 
+        unsigned int encoded_bytes, const unsigned char *encoded, 
+        unsigned int label_bytes, const unsigned char *label);
 
+#define RSA_ERROR_OAEP_DECODE -3
 
 
 /**
  * PKCS #1 Signature Generation Using PSS encoding method
  */
-int RSA_PSS_sign(RSA_private_key *key, ByteArray signature,
-        unsigned int message_bytes, ByteArray message, 
-        unsigned int salt_bytes);
+int RSA_PSS_sign(const RSA_private_key *key, unsigned char *signature,
+        unsigned int message_bytes, const unsigned char *message);
 
 /**
  * PKCS #1 Signature Verification
+ * 
+ * Note: the original ciphertext will be overwritten by this function.
  */
-void RSA_PSS_verify(RSA_public_key *key, unsigned int message_bytes, ByteArray m, unsigned int m_bytes, unsigned int s_bytes, ByteArray s);
+int RSA_PSS_verify(const RSA_public_key *key, 
+        unsigned int message_bytes, const unsigned char *message, 
+        unsigned int signature_bytes, unsigned char *signature);
 
 /**
  * PKCS #1 PSS encoding
  */
-void PSS_encode(unsigned int message_bytes, ByteArray message, unsigned int em_bytes, ByteArray em, unsigned int salt_bytes);
-
+int PSS_encode(unsigned char *encoded, 
+		unsigned int message_bytes, const unsigned char *message);
 /**
  * PKCS #1 PSS verification
  */
-void PSS_verify(unsigned int m_bytes, ByteArray m, unsigned int em_bytes, ByteArray em, unsigned int salt_bytes);
+int PSS_verify(unsigned int message_bytes, const unsigned char *message, 
+		unsigned int encoded_bytes, const unsigned char *encoded);
+
+#define RSA_PSS_CONSISTENT 1
+#define RSA_ERROR_PSS_INCONSISTENT -4
 
 #endif	// __RSA_H

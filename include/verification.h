@@ -20,8 +20,7 @@
 #ifndef __verification_H
 #define __verification_H
 
-#include "types.h"
-#include "crypto_multos.h"
+#include "MULTOS.h"
 
 /**
  * Select the attributes to be disclosed.

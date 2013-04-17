@@ -20,7 +20,272 @@
 #ifndef __MULTOS_H
 #define __MULTOS_H
 
-#include "melasm.h"
+#include <melasm.h>
+
+/**
+ * Load CCR
+ * 
+ * This primitive pushes the Condition Code register onto the stack.
+ * 
+ * Stack input:  []
+ * Stack output: [ CCR ]
+ * 
+ * The 1-byte output parameter CCR holds a byte whose value is the same 
+ * as that of the CCR.
+ * 
+ * This primitive pushes one byte to the stack that contains the same 
+ * bit settings as the Condition Code Register.
+ */
+#define PRIM_LOAD_CCR 0x05
+
+/**
+ * Bit Manipulate Byte
+ * 
+ * This primitive performs bit-wise operations on the top byte of the 
+ * stack.
+ * 
+ * The argument Option is a bitmap controlling what logical operation is
+ * performed and MaskByte is a literal byte holding the mask to use for 
+ * operation.
+ * 
+ * Stack input:  [ ByteIn ]
+ * Stack output: [ ByteOut ]
+ * 
+ * The 1-byte parameter ByteIn is the byte value that will be 
+ * manipulated according to the binary operation specified by Option 
+ * using the literal MaskByte as the second operand. The 1-byte value 
+ * ByteOut depends on the Options argument. It may be the original byte
+ * or the result of the logical operation.
+ * 
+ * Depending on the Option argument this primitive performs one of four 
+ * binary logical operations. They are:
+ *  - AND: which returns a true bit only if both corresponding bits in 
+ *    the input and mask are true
+ *  - OR: which returns a true bit if either of the corresponding bits 
+ *    in the input or mask are true
+ *  - XOR: This is a logical Exclusive OR operation, which returns a 
+ *    true bit only if either of the corresponding bits in the input or
+ *    mask are true, but false if both are true
+ *  - EQU: This logical operation is also known as a Exclusive NOR 
+ *    (XNOR), which returns a true bit only if both corresponding bits 
+ *    in the input and mask are of the same value
+ * 
+ * The following table shows how the Option argument is coded. The 
+ * numbers in the top row correspond to the bit offset, where the most 
+ * significant bit occupies offset 7.
+ * 
+ *  7  6  5  4  3  2  1  0  Comments
+ * ---------------------------------
+ *  0  -  -  -  -  -  -  -  Do not modify ByteIn
+ *  1  -  -  -  -  -  -  -  Overwrite ByteIn with result of operation
+ *  -  0  0  0  0  0  -  -  Any other values are undefined
+ *  -  -  -  -  -  -  0  0  Calculate ByteIn XOR MaskByte
+ *  -  -  -  -  -  -  0  1  Calculate ByteIn EQU MaskByte
+ *  -  -  -  -  -  -  1  0  Calculate ByteIn OR MaskByte
+ *  -  -  -  -  -  -  1  1  Calculate ByteIn AND MaskByte
+ * 
+ * Regardless of whether the ByteIn value is modified, the Condition 
+ * Code Register reflects the result of the operation.
+ */
+#define PRIM_BIT_MANIPULATE_BYTE 0x01
+
+/**
+ * Memory Copy
+ * 
+ * This primitive copies a block of bytes from one location to another.
+ * 
+ * Stack input:  [ length | destAddr | sourceAddr ]
+ * Stack output: []
+ * 
+ * All of the parameters are 2 bytes in size. The value Length is the 
+ * number of bytes to copy. The values DestAddr and SourceAddr are, 
+ * respectively, the locations to where and from where the data is 
+ * copied.
+ * 
+ * Where the number of bytes to be copied is a compile time constant and
+ * Length is no more than 255 bytes the primitive Memory Copy Fixed 
+ * Length may be used.
+ * 
+ * This primitive works correctly even if the source and destination 
+ * blocks overlap.
+ */
+#define PRIM_COPY 0x0C
+
+/**
+ * Shift Right
+ * 
+ * This primitive performs a bitwise shift right on a block of bytes.
+ * 
+ * Both arguments are 1-byte in size. Length gives the size of the data 
+ * block to be shifted and ShiftBits indicates the number of bits to 
+ * shift.
+ * 
+ * Stack input:  [ BytesIn ]
+ * Stack output: [ BytesOut ]
+ * 
+ * The input parameter BytesIn is of size Length and is the byte block 
+ * to be shifted. The output parameter BytesOut is the byte block of 
+ * size Length that holds the result of ShiftBits shift operations on 
+ * BytesIn.
+ * 
+ * This primitive bit-shifts data rightwards, filling the 
+ * most-significant bits with zeroes. The effect of the primitive is 
+ * undefined if any of the following is true:
+ *  - ShiftBits is zero
+ *  - Length is zero
+ *  - ShiftBits >=8 * Length
+ */
+#define PRIM_SHIFT_RIGHT 0x03
+
+/**
+ * Memory Copy Fixed Length
+ * 
+ * This primitive copies a block of bytes of a fixed length from one 
+ * location to another.
+ * 
+ * The argument Length is the number of bytes to copy.
+ * 
+ * Stack input:  [ destAddr, sourceAddr ]
+ * Stack output: []
+ * 
+ * All of the parameters are 2 bytes in size. The values DestAddr and 
+ * SourceAddr are, respectively, the locations to where and from where 
+ * the data is copied.
+ * 
+ * The Length value is specified using a single byte. Therefore, the 
+ * maximum length of a block is 255 bytes.
+ * 
+ * This primitive works correctly even if the blocks overlap.
+ */
+#define PRIM_COPY_FIXED 0x0E
+
+/**
+ * Memory Copy Non-Atomic
+ * 
+ * This primitive copies a block of bytes from one location to another.
+ * If the byte block is copied into the static area, data item 
+ * protection function will be disabled if possible.
+ * 
+ * Stack input:  [ length | destAddr | srcAddr ]
+ * Stack output: []
+ * 
+ * All of the parameters are 2 bytes in size. The value Length is the 
+ * number of bytes to copy. The values DestAddr and SourceAddr are, 
+ * respectively, the locations to where and from where the data is 
+ * copied.
+ * 
+ * This primitive works correctly even if the source and destination 
+ * blocks overlap. 
+ * 
+ * Where the number of bytes to be copied is a compile time constant and
+ * Length is no more than 255 bytes the primitive Memory Copy Non-Atomic
+ * Fixed Length may be used.
+ * 
+ * When copying into the static memory area with this primitive, the 
+ * copying will be performed more quickly than with Memory Copy 
+ * primitive as the data items are not protected.
+ * 
+ * This primitive is a request for a non-atomic memory copy. Non-atomic 
+ * means that the data will be written in EEPROM page size blocks (see 
+ * [MIR] for page size information for a specific implementation) when 
+ * complete pages are available. If the data being copied results in 
+ * writing to only a part of a page, then MULTOS will revert to an 
+ * atomic copy. Whilst this copy operation may be faster the data in the
+ * destination will not be protected if power-off occurred during the 
+ * copying to the static area. MULTOS will always guarantee the 
+ * integrity of data other than the data being copied.
+ */
+#define PRIM_COPY_NON_ATOMIC 0x0F
+
+/**
+ * Memory Copy Non-Atomic Fixed Length
+ * 
+ * This primitive copies a block of bytes of a fixed length from one 
+ * location to another. If the byte block is copied into the static 
+ * area, data item protection function will be disabled if possible.
+ * 
+ * The argument Length is the number of bytes to copy.
+ * 
+ * Stack input:  [ destAddr | sourceAddr ]
+ * Stack output: []
+ * 
+ * All of the parameters are 2 bytes in size. The values DestAddr and 
+ * SourceAddr are, respectively, the locations to where and from where 
+ * the data is copied.
+ * 
+ * This primitive works correctly even if the source and destination 
+ * blocks overlap.
+ * 
+ * When copying into the static memory area with this primitive, the 
+ * copying will be performed more quickly than with Memory Copy 
+ * primitive as the data items are not protected.
+ * 
+ * This primitive is a request for a non-atomic memory copy. Non-atomic 
+ * means that the data will be written in EEPROM page size blocks (see 
+ * [MIR] for page size information for a specific implementation) when 
+ * complete pages are available. If the data being copied results in 
+ * writing to only a part of a page, then MULTOS will revert to an 
+ * atomic copy. Whilst this copy operation may be faster the data in the
+ * destination will not be protected if power-off occurred during the 
+ * copying to the static area. MULTOS will always guarantee the 
+ * integrity of data other than the data being copied.
+ */
+#define PRIM_COPY_FIXED_NON_ATOMIC 0x13
+
+/**
+ * Memory Compare
+ * 
+ * This primitive compares two blocks of bytes to determine if they hold
+ * the same data.
+ * 
+ * Stack input:  [ length | addr1 | addr2 ]
+ * Stack output: []
+ * 
+ * The 2-byte parameter Length gives the size of the memory areas to be 
+ * compared. The 2-byte values Addr1 and Addr2 are the locations of the 
+ * areas.
+ * 
+ * The comparison performed by this primitive is based on subtraction. 
+ * The second operand, the area corresponding to the address on the top 
+ * of the stack, is subtracted from the first. No data is modified, but 
+ * the Condition Code Register is set according to the result of the 
+ * operation.
+ * 
+ * There are three possible results of the comparison of blocks of size 
+ * Length. They and the CCR setting used to indicate that result are:
+ *  - When the byte block at Addr1 > the byte block at Addr2, both CCR C
+ *    and CCR Z flags are cleared.
+ *  - When the byte block at Addr1 = the byte block at Addr2, the CCR C 
+ *    flag is cleared and CCR Z flag is set.
+ *  - When the byte block at Addr1 < the byte block at Addr2, the CCR C 
+ *    flag is set and CCR Z flag is cleared.
+ * 
+ * Where the number of bytes to be compared is a compile time constant 
+ * and Length is no more than 255 bytes the primitive Memory Compare 
+ * Fixed Length may be used.
+ */
+#define PRIM_COMPARE 0x0B
+
+/**
+ * Get Random Number
+ * 
+ * This primitive places an eight byte random number onto the stack.
+ * 
+ * Stack input:  []
+ * Stack output: [ bytes ]
+ * 
+ * The output parameter Bytes holds the 8-byte block of random data 
+ * returned by the primitive.
+ * 
+ * The method of random number generation is implementation specific. 
+ * So, it may be generated using a hardware assisted 'true' random 
+ * number generator or it may be generated as a pseudo-random number 
+ * from a seed value. In either case, the process is performed in such a
+ * way that the secrecy of the number is guaranteed. It is not possible 
+ * for any coresident application to determine what number was provided 
+ * or will be provided subsequently.
+ */
+#define PRIM_RANDOM_NUMBER 0xC4
 
 /**
  * SHA-1
@@ -133,5 +398,159 @@
  * beyond addrMessageRemainder + lenMessageRemainder or abend.
  */
 #define PRIM_SECURE_HASH_IV 0xE4
+
+/**
+ * MultiplyN
+ * 
+ * This primitive multiplies two unsigned blocks of bytes from the stack
+ * together and leaves the result on the stack.
+ * 
+ * The argument Length indicates the size of the multiplicands.
+ * 
+ * Stack input:  [ Operand1 | Operand2 ]
+ * Stack output: [ Output ]
+ * 
+ * The parameters Operand1 and Operand2 are the values of size Length 
+ * that are to be multiplied. The output parameter Output holds the 
+ * result of the multiplication is twice the size of Length.
+ * 
+ * This primitive performs unsigned multiplication of two numbers. The 
+ * result replaces the two operands at the top of stack.
+ * 
+ * Note that it is possible for Operand1 and Operand2 to be placed at 
+ * the end of session data rather than on the stack.
+ */
+#define PRIM_MULTIPLY 0x10
+
+/**
+ * Modular Exponentiation / RSA Sign
+ * 
+ * This primitive performs a modular exponentiation operation, the basis
+ * of the RSA algorithm. This version of the primitive will execute with
+ * full countermeasures to protect the algorithm.
+ * 
+ * Stack input:  [ eLen | mLen | eAddr | mAddr | inAddr | outAddr ]
+ * Stack output: []
+ * 
+ * All parameters are 2 bytes in size. The values eLen and mLen 
+ * represent the length of the exponent and modulus respectively. These 
+ * lengths represent the size in bytes. The value eAddr is the location 
+ * of the exponent of size eLen, while mAddr is the location of the 
+ * modulus of size mLen. The addresses inAddr and outAddr are the 
+ * location of the input to the modular exponentiation operation and the
+ * address to where the output will be written.
+ * 
+ * This primitive performs modular exponentiation operation and the 
+ * result is written at the specified address outAddr.
+ * 
+ * Moduli with length that is not a multiple of 8 bits are padded at the
+ * least significant end with bits 0. So, a 1023-bit modulus would have 
+ * the least significant bit of the least significant byte set to 0.
+ * 
+ * The size of the input and output is considered to the same as that of
+ * the modulus. They are all mLen in size.
+ * 
+ * The primitive will function normally if inAddr and outAddr point to 
+ * the same memory area. That is to say the output can overwrite the 
+ * input.
+ * 
+ * In order to enable modular exponentiation to operate correctly there 
+ * are a number of general conditions that must be met:
+ *  - The modulus must be odd.
+ *  - The base value must be less than the modulus.
+ *  - The exponent must be less than the modulus.
+ *  - The length of the exponent must be less than or equal to the 
+ *    length of the modulus.
+ * 
+ * There are some implementation specifics that may impact on the usage 
+ * of this primitive. For example, the most significant byte of the 
+ * modulus should not be zero although some platforms may permit it. As 
+ * another example, some implementations may only work on fixed key 
+ * lengths. It may also be the case that an implementation may provide 
+ * optimised support for an exponent length of 1 with a value of 3 and 
+ * from MULTOS 4.2 one may also provide optimised support for an 
+ * exponent length of 3 and a value of 65537. See the MULTOS 
+ * Implementation Report [MIR] for specific information.
+ */
+#define PRIM_MODULAR_EXPONENTIATION 0xC8
+
+/**
+ * RSA Verify / Modular Exponentiation
+ * 
+ * This primitive performs a modular exponentiation operation, the basis
+ * of the RSA algorithm. This version of the primitive is optimised for 
+ * use with Public key operations only and platform countermeasures that
+ * protect the RSA algorithm may be disabled. For Private key operations
+ * the Modular Exponentiation / RSA Sign primitive should be used.
+ * 
+ * IT IS STRONGLY ADVISED THIS PRIMITIVE IS USED WITH PUBLIC KEYS ONLY.
+ * 
+ * Stack input:  [ eLen | mLen | eAddr | mAddr | inAddr | outAddr ]
+ * Stack output: []
+ * 
+ * All parameters are 2 bytes in size. The values eLen and mLen 
+ * represent the length of the exponent and modulus respectively. These 
+ * lengths represent the size in bytes. The value eAddr is the location 
+ * of the exponent of size eLen, while mAddr is the location of the 
+ * modulus of size mLen. The addresses inAddr and outAddr are the 
+ * location of the input to the modular exponentiation operation and the
+ * address to where the output will be written.
+ * 
+ * This primitive performs modular exponentiation operation and the 
+ * result is written at the specified address outAddr.
+ * 
+ * Moduli with length that is not a multiple of 8 bits are padded at the
+ * least significant end with bits 0. So, a 1023-bit modulus would have 
+ * the least significant bit of the least significant byte set to 0.
+ * 
+ * The size of the input and output is considered to the same as that of
+ * the modulus. They are all mLen in size.
+ * 
+ * The primitive will function normally if inAddr and outAddr point to 
+ * the same memory area. That is to say the output can overwrite the 
+ * input.
+ * 
+ * In order to enable modular exponentiation to operate correctly there 
+ * are a number of general conditions that must be met:
+ *  - The modulus must be odd.
+ *  - The base value must be less than the modulus.
+ *  - The exponent must be less than the modulus.
+ *  - The length of the exponent must be less than or equal to the 
+ *    length of the modulus.
+ * 
+ * There are some implementation specifics that may impact on the usage 
+ * of this primitive. For example, the most significant byte of the 
+ * modulus should not be zero although some platforms may permit it. As 
+ * another example, some implementations may only work on fixed key 
+ * lengths. It may also be the case that an implementation may provide 
+ * optimised support for an exponent length of 1 with a value of 3 and 
+ * from MULTOS 4.2 one may also provide optimised support for an 
+ * exponent length of 3 and a value of 65537. See the MULTOS 
+ * Implementation Report [MIR] for specific information.
+ */
+#define PRIM_RSA_VERIFY 0xEB
+
+/**
+ * Modular Multiplication
+ * 
+ * This primitive multiples two operands and reduces the result of the 
+ * multiplication modulo a given modulus.
+ * 
+ * Stack input:  [ lenMod | addrOp1 | addrOp2 | addrMod ]
+ * Stack output: []
+ * 
+ * All the parameters are 2 bytes in size. The parameter lenMod is the 
+ * size of the modulus supplied and located at addrMod. The parameters 
+ * addrOp1 and addrOp2 are the locations of the multiplicands.
+ * 
+ * This primitive calculates a product modulo a modulus, that is 
+ * (Operand1 * Operand2) mod modulus. The result overwrites the first 
+ * operand.
+ * 
+ * Both operands must represent values that are less than that of the 
+ * modulus. The modulus and both operands are considered to be of size 
+ * lenMod.
+ */
+#define PRIM_MODULAR_MULTIPLICATION 0xC2
 
 #endif // __MULTOS_H

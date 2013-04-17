@@ -19,9 +19,8 @@
 
 #include "encoding.h"
 
-#include <string.h> // for memcpy()
-
 #include "debug.h"
+#include "memory.h"
 
 /********************************************************************/
 /* Helper functions                                                 */
@@ -38,17 +37,17 @@
  * @param offset in front of which the length should be stored
  * @return the offset of the encoded length in the buffer
  */
-int asn1_encode_length(int length, ByteArray buffer, int offset) {
-  Byte prefix = 0x80;
+int asn1_encode_length(int length, unsigned char *buffer, int offset) {
+  unsigned char prefix = 0x80;
   
   // Use the short form when the length is between 0 and 127
   if (length < 0x80) {
-    buffer[--offset] = (Byte) length;
+    buffer[--offset] = (unsigned char) length;
 
   // Use the long form when the length is 128 or greater
   } else {
     while (length > 0) {
-      buffer[--offset] = (Byte) length;
+      buffer[--offset] = (unsigned char) length;
       length >>= 8;
       prefix++;
     }
@@ -71,8 +70,8 @@ int asn1_encode_length(int length, ByteArray buffer, int offset) {
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-int asn1_encode_int(ByteArray number, int length, 
-                    ByteArray buffer, int offset) {
+int asn1_encode_int(unsigned char *number, int length, 
+                    unsigned char *buffer, int offset) {
   int skip = 0;
 
   // Determine the number of zero (0x00) bytes to skip
@@ -83,7 +82,7 @@ int asn1_encode_int(ByteArray number, int length,
   // Store the value
   length -= skip;
   offset -= length;
-  memcpy(buffer + offset, number + skip, length);
+  CopyBytes(length, buffer + offset, number + skip);
   
   // If needed, add a 0x00 byte for correct two-complements encoding
   if ((buffer[offset] & 0x80) != 0x00) {

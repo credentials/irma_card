@@ -20,17 +20,16 @@
 #include "verification.h"
 
 #include <ISO7816.h>
-#include <multosarith.h>
-#include <multosccr.h>
-#include <multoscrypto.h>
 
 #include "apdu.h"
 #include "externals.h"
 #include "sizes.h"
 #include "types.h"
 #include "debug.h"
-#include "crypto_helper.h"
-#include "crypto_multos.h"
+#include "utils.h"
+#include "random.h"
+#include "memory.h"
+#include "arithmetic.h"
 
 /********************************************************************/
 /* Proving functions                                                */
@@ -86,51 +85,51 @@ void constructProof(void) {
 
 #ifdef SIMULATOR
   // Get context from session memory since the simulator clears public
-  COPYN(SIZE_H, public.prove.context, session.prove.context);
+  Copy(SIZE_H, public.prove.context, session.prove.context);
 #endif // SIMULATOR
 
   // Generate random values for m~[i], e~, v~ and rA
   for (i = 0; i <= credential->size; i++) {
     if (disclosed(i) == 0) {
       // IMPORTANT: Correction to the length of mTilde to prevent overflows
-      crypto_generate_random(session.prove.mHat[i], LENGTH_M_ - 1);
+      RandomBits(session.prove.mHat[i], LENGTH_M_ - 1);
     }
   }
   debugValues("mTilde", (ByteArray) session.prove.mHat, SIZE_M_, SIZE_L);
   // IMPORTANT: Correction to the length of eTilde to prevent overflows
-  crypto_generate_random(public.prove.eHat, LENGTH_E_ - 1);
+  RandomBits(public.prove.eHat, LENGTH_E_ - 1);
   debugValue("eTilde", public.prove.eHat, SIZE_E_);
   // IMPORTANT: Correction to the length of vTilde to prevent overflows
-  crypto_generate_random(public.prove.vHat, LENGTH_V_ - 1);
+  RandomBits(public.prove.vHat, LENGTH_V_ - 1);
   debugValue("vTilde", public.prove.vHat, SIZE_V_);
   // IMPORTANT: Correction to the length of rA to prevent negative values
-  crypto_generate_random(public.prove.rA + 1, LENGTH_R_A - 13);
+  RandomBits(public.prove.rA + 1, LENGTH_R_A - 13);
   debugValue("rA", public.prove.rA, SIZE_R_A);
 
   // Compute A' = A * S^r_A
   // IMPORTANT: Correction to the size of rA to skip initial zero bytes
-  crypto_modexp_special(SIZE_R_A - 1, public.prove.rA + 1, public.prove.APrime,
+  ModExpSpecial(SIZE_R_A - 1, public.prove.rA + 1, public.prove.APrime,
     public.prove.buffer.number[0]);
   debugValue("A' = S^r_A mod n", public.prove.APrime, SIZE_N);
-  crypto_modmul(SIZE_N, public.prove.APrime, credential->signature.A, credential->issuerKey.n);
+  ModMul(SIZE_N, public.prove.APrime, credential->signature.A, credential->issuerKey.n);
   debugValue("A' = A' * A mod n", public.prove.APrime, SIZE_N);
 
   // Compute ZTilde = A'^eTilde * S^vTilde * (R[i]^mTilde[i] foreach i not in D)
-  crypto_modexp_special(SIZE_V_, public.prove.vHat, public.prove.buffer.number[0],
+  ModExpSpecial(SIZE_V_, public.prove.vHat, public.prove.buffer.number[0],
     public.prove.buffer.number[1]);
   debugValue("ZTilde = S^vTilde", public.prove.buffer.number[0], SIZE_N);
-  crypto_modexp(SIZE_E_, SIZE_N, public.prove.eHat,
+  ModExp(SIZE_E_, SIZE_N, public.prove.eHat,
     credential->issuerKey.n, public.prove.APrime, public.prove.buffer.number[1]);
   debugValue("buffer = A'^eTilde", public.prove.buffer.number[1], SIZE_N);
-  crypto_modmul(SIZE_N, public.prove.buffer.number[0],
+  ModMul(SIZE_N, public.prove.buffer.number[0],
     public.prove.buffer.number[1], credential->issuerKey.n);
   debugValue("ZTilde = ZTilde * buffer", public.prove.buffer.number[0], SIZE_N);
   for (i = 0; i <= credential->size; i++) {
     if (disclosed(i) == 0) {
-      crypto_modexp(SIZE_M_, SIZE_N, session.prove.mHat[i], credential->issuerKey.n,
+      ModExp(SIZE_M_, SIZE_N, session.prove.mHat[i], credential->issuerKey.n,
         credential->issuerKey.R[i], public.prove.buffer.number[1]);
       debugValue("R_i^m_i", public.prove.buffer.number[1], SIZE_N);
-      crypto_modmul(SIZE_N, public.prove.buffer.number[0],
+      ModMul(SIZE_N, public.prove.buffer.number[0],
         public.prove.buffer.number[1], credential->issuerKey.n);
       debugValue("ZTilde = ZTilde * buffer", public.prove.buffer.number[0], SIZE_N);
     }
@@ -145,7 +144,7 @@ void constructProof(void) {
   public.prove.list[2].size = SIZE_N;
   public.prove.list[3].data = public.prove.apdu.nonce;
   public.prove.list[3].size = SIZE_STATZK;
-  crypto_compute_hash(public.prove.list, 4, public.prove.apdu.challenge,
+  ComputeHash(public.prove.list, 4, public.prove.apdu.challenge,
     public.prove.buffer.data, SIZE_BUFFER_C1);
   debugValue("c", public.prove.apdu.challenge, SIZE_H);
 
@@ -171,9 +170,9 @@ void constructProof(void) {
 
 #ifdef SIMULATOR
   // Store responses in session memory since the simulator clears public
-  COPYN(SIZE_N, session.prove.APrime, public.prove.APrime);
-  COPYN(SIZE_E_, session.prove.eHat, public.prove.eHat);
-  COPYN(SIZE_V_, session.prove.vHat, public.prove.vHat);
+  Copy(SIZE_N, session.prove.APrime, public.prove.APrime);
+  Copy(SIZE_E_, session.prove.eHat, public.prove.eHat);
+  Copy(SIZE_V_, session.prove.vHat, public.prove.vHat);
 #endif // SIMULATOR
 
   // return eHat, vHat, mHat[i], c, A'

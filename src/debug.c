@@ -43,11 +43,11 @@ void debugInteger(String label, int value) {
   printf("%s: %d\n", label, value);
 }
 
-void debugPointer(String label, ByteArray value) {
+void debugPointer(String label, const unsigned char *value) {
   printf("%s: %p\n", label, value);
 }
 
-void debugValue(String label, ByteArray value, int length) {
+void debugValue(String label, const unsigned char *value, int length) {
   int i;
 
   printf("%s: ", label);
@@ -57,7 +57,7 @@ void debugValue(String label, ByteArray value, int length) {
   printf("\n");
 }
 
-void debugValueI(String label, ByteArray value, int length, int index) {
+void debugValueI(String label, const unsigned char *value, int length, int index) {
   int i;
 
   printf("%s[%d]: ", label, index);
@@ -67,7 +67,7 @@ void debugValueI(String label, ByteArray value, int length, int index) {
   printf("\n");
 }
 
-void debugValues(String label, ByteArray value, int length, int count) {
+void debugValues(String label, const unsigned char *value, int length, int count) {
   int i;
 
   for (i = 0; i < count; i++) {

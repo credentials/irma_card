@@ -21,25 +21,6 @@
 #define __SHA_H
 
 #include "MULTOS.h"
-#include "types.h"
-
-#ifndef SIMULATOR
-  #define PRIM_HASH PRIM_SECURE_HASH
-#else // !SIMULATOR
-  #define PRIM_HASH PRIM_SHA1
-#endif // !SIMULATOR
-
-/**
- * Compute a cryptographic hash of the given input values
- * 
- * @param list of values to be included in the hash
- * @param length of the values list
- * @param result of the hashing operation
- * @param buffer which can be used for temporary storage
- * @param size of the buffer
- */
-void crypto_compute_hash(ValueArray list, int length, ByteArray result,
-                         ByteArray buffer, int size);
 
 #define SHA_1_BITS   160
 #define SHA_224_BITS 224
@@ -49,11 +30,11 @@ void crypto_compute_hash(ValueArray list, int length, ByteArray result,
 
 #define SHA_BITS_TO_BYTES(bits) ((bits + 7) /8)
 
-#define SHA_1_BYTES   SHA_BITS_TO_BYTES(SHA1_BITS)
-#define SHA_224_BYTES SHA_BITS_TO_BYTES(SHA224_BITS)
-#define SHA_256_BYTES SHA_BITS_TO_BYTES(SHA256_BITS)
-#define SHA_384_BYTES SHA_BITS_TO_BYTES(SHA384_BITS)
-#define SHA_512_BYTES SHA_BITS_TO_BYTES(SHA512_BITS)
+#define SHA_1_BYTES   SHA_BITS_TO_BYTES(SHA_1_BITS)
+#define SHA_224_BYTES SHA_BITS_TO_BYTES(SHA_224_BITS)
+#define SHA_256_BYTES SHA_BITS_TO_BYTES(SHA_256_BITS)
+#define SHA_384_BYTES SHA_BITS_TO_BYTES(SHA_384_BITS)
+#define SHA_512_BYTES SHA_BITS_TO_BYTES(SHA_512_BITS)
 
 #define SHA_1   SHA_1_BYTES
 #define SHA_224 SHA_224_BYTES
@@ -61,22 +42,13 @@ void crypto_compute_hash(ValueArray list, int length, ByteArray result,
 #define SHA_384 SHA_384_BYTES
 #define SHA_512 SHA_512_BYTES
 
-void SHA(unsigned int digest_bytes, unsigned char *digest, unsigned int data_bytes, unsigned char *data) {
-  __push(data_bytes);
-#ifndef SIMULATOR 
-  // This can be ommited when using the simulator since it only supports 
-  // one size (SHA-1, 160 bits, 20 bytes), in this case the ouput will 
-  // be padded to meet the requested size.
-  __push(digest_bytes);
-#endif // SIMULATOR
-  __push(digest);
-  __push(data);
-  __code(PRIM, PRIM_HASH);
-  
-#ifdef SIMULATOR
-  // Apply padding if needed when using the simulator.
-  while (digest_bytes-- > 20) { digest[digest_bytes] = digest_bytes; }
-#endif // SIMULATOR
-}
+#define SHA(digest_bytes, digest, data_bytes, data) \
+do { \
+  __push(data_bytes); \
+  __push(digest_bytes); \
+  __push(digest); \
+  __push(data); \
+  __code(PRIM, PRIM_SECURE_HASH); \
+} while (0)
 
 #endif // __SHA_H
