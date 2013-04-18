@@ -150,7 +150,7 @@ typedef struct {
   Number ZPrime; // 128
   Number buffer; // 128
   Number tmp; // 128
-} IssuanceSignatureVerification; // 384
+} CLSignatureVerification; // 384
 
 typedef struct {
   Byte buffer[SIZE_BUFFER_C2]; // 438
@@ -191,7 +191,7 @@ typedef struct {
 typedef struct {
   ResponseM mHat[SIZE_L]; // 74*6 (444)
   AttributeMask disclose; // 2
-} VerificationSession; // 444 + 2 = 446 (444 + 2 + 32 + 128 + 255 + 57 = 918)
+} VerificationSession; // 444 + 2 = 446
 
 typedef struct {
   CredentialFlags user;
@@ -205,7 +205,6 @@ typedef union {
 
   IssuanceSetup issuanceSetup;
   IssuanceCommitment issue;
-  IssuanceSignatureVerification vfySig;
   IssuanceProofVerification vfyPrf;
 
   VerificationSetup verificationSetup;
@@ -218,6 +217,7 @@ typedef union {
   Byte base[1];
 
   IssuanceSession issue;
+  CLSignatureVerification vfySig;
   IssuanceProofSession vfyPrf;
 
   VerificationSession prove;

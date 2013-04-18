@@ -19,17 +19,15 @@
 
 #include "verification.h"
 
-#include <ISO7816.h>
-
-#include "apdu.h"
+#include "APDU.h"
+#include "arithmetic.h"
+#include "debug.h"
 #include "externals.h"
+#include "memory.h"
+#include "random.h"
 #include "sizes.h"
 #include "types.h"
-#include "debug.h"
 #include "utils.h"
-#include "random.h"
-#include "memory.h"
-#include "arithmetic.h"
 
 /********************************************************************/
 /* Proving functions                                                */
@@ -46,21 +44,21 @@ void selectAttributes(int selection) {
   if ((selection & 0x0001) != 0) {
     debugError("selectAttributes(): master secret cannot be disclosed");
     credential = NULL;
-    ReturnSW(ISO7816_SW_WRONG_DATA);
+    APDU_ReturnSW(SW_WRONG_DATA);
   }
 
   // Always disclose the expiry attribute.
   if ((selection & 0x0002) == 0) {
     debugError("selectAttributes(): expiry attribute must be disclosed");
     credential = NULL;
-    ReturnSW(ISO7816_SW_WRONG_DATA);
+    APDU_ReturnSW(SW_WRONG_DATA);
   }
 
   // Do not allow non-existant attributes.
   if ((selection & (0xFFFF << credential->size + 1)) != 0) {
     debugError("selectAttributes(): selection contains non-existant attributes");
     credential = NULL;
-    ReturnSW(ISO7816_SW_REFERENCED_DATA_NOT_FOUND);
+    APDU_ReturnSW(SW_REFERENCED_DATA_NOT_FOUND);
   }
 
   // Set the attribute disclosure selection.
@@ -94,29 +92,23 @@ void constructProof(void) {
 
   // Compute A' = A * S^r_A
   // IMPORTANT: Correction to the size of rA to skip initial zero bytes
-  ModExpSpecial(SIZE_R_A - 1, public.prove.rA + 1, public.prove.APrime,
-    public.prove.buffer.number[0]);
+  ModExpSpecial(SIZE_R_A - 1, public.prove.rA + 1, public.prove.APrime, public.prove.buffer.number[0]);
   debugValue("A' = S^r_A mod n", public.prove.APrime, SIZE_N);
   ModMul(SIZE_N, public.prove.APrime, credential->signature.A, credential->issuerKey.n);
   debugValue("A' = A' * A mod n", public.prove.APrime, SIZE_N);
 
   // Compute ZTilde = A'^eTilde * S^vTilde * (R[i]^mTilde[i] foreach i not in D)
-  ModExpSpecial(SIZE_V_, public.prove.vHat, public.prove.buffer.number[0],
-    public.prove.buffer.number[1]);
+  ModExpSpecial(SIZE_V_, public.prove.vHat, public.prove.buffer.number[0], public.prove.buffer.number[1]);
   debugValue("ZTilde = S^vTilde", public.prove.buffer.number[0], SIZE_N);
-  ModExp(SIZE_E_, SIZE_N, public.prove.eHat,
-    credential->issuerKey.n, public.prove.APrime, public.prove.buffer.number[1]);
+  ModExp(SIZE_E_, SIZE_N, public.prove.eHat, credential->issuerKey.n, public.prove.APrime, public.prove.buffer.number[1]);
   debugValue("buffer = A'^eTilde", public.prove.buffer.number[1], SIZE_N);
-  ModMul(SIZE_N, public.prove.buffer.number[0],
-    public.prove.buffer.number[1], credential->issuerKey.n);
+  ModMul(SIZE_N, public.prove.buffer.number[0], public.prove.buffer.number[1], credential->issuerKey.n);
   debugValue("ZTilde = ZTilde * buffer", public.prove.buffer.number[0], SIZE_N);
   for (i = 0; i <= credential->size; i++) {
     if (disclosed(i) == 0) {
-      ModExp(SIZE_M_, SIZE_N, session.prove.mHat[i], credential->issuerKey.n,
-        credential->issuerKey.R[i], public.prove.buffer.number[1]);
+      ModExp(SIZE_M_, SIZE_N, session.prove.mHat[i], credential->issuerKey.n, credential->issuerKey.R[i], public.prove.buffer.number[1]);
       debugValue("R_i^m_i", public.prove.buffer.number[1], SIZE_N);
-      ModMul(SIZE_N, public.prove.buffer.number[0],
-        public.prove.buffer.number[1], credential->issuerKey.n);
+      ModMul(SIZE_N, public.prove.buffer.number[0], public.prove.buffer.number[1], credential->issuerKey.n);
       debugValue("ZTilde = ZTilde * buffer", public.prove.buffer.number[0], SIZE_N);
     }
   }
@@ -130,13 +122,11 @@ void constructProof(void) {
   public.prove.list[2].size = SIZE_N;
   public.prove.list[3].data = public.prove.apdu.nonce;
   public.prove.list[3].size = SIZE_STATZK;
-  ComputeHash(public.prove.list, 4, public.prove.apdu.challenge,
-    public.prove.buffer.data, SIZE_BUFFER_C1);
+  ComputeHash(public.prove.list, 4, public.prove.apdu.challenge, public.prove.buffer.data, SIZE_BUFFER_C1);
   debugValue("c", public.prove.apdu.challenge, SIZE_H);
 
   crypto_compute_ePrime(); // Compute e' = e - 2^(l_e' - 1)
-  debugValue("e' = e - 2^(l_e' - 1)",
-    credential->signature.e + SIZE_E - SIZE_EPRIME, SIZE_EPRIME);
+  debugValue("e' = e - 2^(l_e' - 1)", credential->signature.e + SIZE_E - SIZE_EPRIME, SIZE_EPRIME);
 
   crypto_compute_eHat(); // Compute e^ = e~ + c e'
   debugValue("e^ = e~ + c*e'", public.prove.eHat, SIZE_E_);

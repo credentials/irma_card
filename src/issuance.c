@@ -19,9 +19,7 @@
 
 #include "issuance.h"
 
-#include <ISO7816.h>
-
-#include "apdu.h"
+#include "APDU.h"
 #include "arithmetic.h"
 #include "debug.h"
 #include "externals.h"
@@ -166,33 +164,35 @@ void verifySignature(void) {
   Byte i;
 
   // Clear the memory before starting computations
-  ClearBytes(sizeof(IssuanceSignatureVerification), public.base);
+  ClearBytes(sizeof(CLSignatureVerification), session.base);
 
-  // Compute Ri = R[i]^m[i] mod n forall i
-  ModExpSecure(SIZE_M, SIZE_N, masterSecret, credential->issuerKey.n, credential->issuerKey.R[0], public.vfySig.ZPrime);
-  debugNumber("Z' = R[0]^ms mod n", public.vfySig.ZPrime);
+  // Compute Z' = S^v mod n
+  ModExpSpecial(SIZE_V, credential->signature.v, session.vfySig.ZPrime, session.vfySig.buffer);
+  debugNumber("Z' = S^v mod n", session.vfySig.buffer);
+
+  // Compute Z' = S^v * A^e mod n
+  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, session.vfySig.buffer);
+  debugNumber("buffer = A^e mod n", session.vfySig.buffer);
+  ModMul(SIZE_N, session.vfySig.ZPrime, session.vfySig.buffer, credential->issuerKey.n);
+  debugNumber("Z' = Z' * buffer mod n", session.vfySig.ZPrime);
+
+  // Compute Z' = S^v * A^e * R[i]^m[i] mod n forall i
+  ModExpSecure(SIZE_M, SIZE_N, masterSecret, credential->issuerKey.n, credential->issuerKey.R[0], session.vfySig.buffer);
+  debugNumber("buffer = R[0]^ms mod n", session.vfySig.buffer);
+  ModMul(SIZE_N, session.vfySig.ZPrime, session.vfySig.buffer, credential->issuerKey.n);
+  debugNumber("Z' = Z' * buffer mod n", session.vfySig.ZPrime);
   for (i = 0; i < credential->size; i++) {
-    ModExp(SIZE_M, SIZE_N, credential->attribute[i], credential->issuerKey.n, credential->issuerKey.R[i + 1], public.vfySig.buffer);
-    debugNumber("buffer = R[i]^m[i] mod n", public.vfySig.buffer);
-    ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer, credential->issuerKey.n);
-    debugNumber("Z' = Z' * buffer mod n", public.vfySig.ZPrime);
+    ModExp(SIZE_M, SIZE_N, credential->attribute[i], credential->issuerKey.n, credential->issuerKey.R[i + 1], session.vfySig.buffer);
+    debugNumber("buffer = R[i]^m[i] mod n", session.vfySig.buffer);
+    ModMul(SIZE_N, session.vfySig.ZPrime, session.vfySig.buffer, credential->issuerKey.n);
+    debugNumber("Z' = Z' * buffer mod n", session.vfySig.ZPrime);
   }
 
-  // Compute Z' = A^e * S^v * Ri mod n
-  ModExpSpecial(SIZE_V, credential->signature.v, public.vfySig.buffer, public.vfySig.tmp);
-  debugNumber("buffer = S^v mod n", public.vfySig.buffer);
-  ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer, credential->issuerKey.n);
-  debugNumber("Z' = Z' * buffer mod n", public.vfySig.ZPrime);
-  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, public.vfySig.buffer);
-  debugNumber("buffer = A^e mod n", public.vfySig.buffer);
-  ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer, credential->issuerKey.n);
-  debugNumber("Z' = Z' * buffer mod n", public.vfySig.ZPrime);
-
-  // - Verify Z =?= Z'
-  if (Compare(SIZE_N, credential->issuerKey.Z, public.vfySig.ZPrime) != 0) {
+  // Verify Z =?= Z'
+  if (Compare(SIZE_N, credential->issuerKey.Z, session.vfySig.ZPrime) != 0) {
     // TODO: clear already stored things?
     debugError("verifySignature(): verification of signature failed");
-    ReturnSW(ISO7816_SW_CONDITIONS_NOT_SATISFIED);
+    APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
   }
 }
 
@@ -207,17 +207,18 @@ void verifySignature(void) {
  */
 void verifyProof(void) {
 
+  // Clear the memory before starting computations
+  ClearBytes(sizeof(IssuanceProofVerification), public.base);
+  ClearBytes(sizeof(IssuanceProofSession), session.base);
+
   // Compute Q = A^e mod n
-  ModExp(SIZE_E, SIZE_N, credential->signature.e,
-    credential->issuerKey.n, credential->signature.A, session.vfyPrf.Q);
+  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, session.vfyPrf.Q);
   debugNumber("Q = A^e mod n", session.vfyPrf.Q);
 
   // Compute AHat = A^(c + s_e * e) = Q^s_e * A^c mod n
-  ModExp(SIZE_N, SIZE_N, credential->proof.response,
-    credential->issuerKey.n, session.vfyPrf.Q, public.vfyPrf.buffer);
+  ModExp(SIZE_N, SIZE_N, credential->proof.response, credential->issuerKey.n, session.vfyPrf.Q, public.vfyPrf.buffer);
   debugNumber("buffer = Q^s_e mod n", public.vfyPrf.buffer);
-  ModExp(SIZE_H, SIZE_N, credential->proof.challenge,
-    credential->issuerKey.n, credential->signature.A, session.vfyPrf.AHat);
+  ModExp(SIZE_H, SIZE_N, credential->proof.challenge, credential->issuerKey.n, credential->signature.A, session.vfyPrf.AHat);
   debugNumber("AHat = A^c mod n", session.vfyPrf.AHat);
   ModMul(SIZE_N, session.vfyPrf.AHat, public.vfyPrf.buffer, credential->issuerKey.n);
   debugNumber("AHat = AHat * buffer", session.vfyPrf.AHat);
@@ -233,14 +234,13 @@ void verifyProof(void) {
   session.vfyPrf.list[3].size = SIZE_STATZK;
   session.vfyPrf.list[4].data = session.vfyPrf.AHat;
   session.vfyPrf.list[4].size = SIZE_N;
-  ComputeHash(session.vfyPrf.list, 5, session.vfyPrf.challenge,
-    public.vfyPrf.buffer, SIZE_BUFFER_C2);
+  ComputeHash(session.vfyPrf.list, 5, session.vfyPrf.challenge, public.vfyPrf.buffer, SIZE_BUFFER_C2);
   debugHash("c'", session.vfyPrf.challenge);
 
   // Verify c =?= c'
   if (Compare(SIZE_H, credential->proof.challenge, session.vfyPrf.challenge) != 0) {
     // TODO: clear already stored things?
     debugError("verifyProof(): verification of P2 failed");
-    ReturnSW(ISO7816_SW_CONDITIONS_NOT_SATISFIED);
+    APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
   }
 }

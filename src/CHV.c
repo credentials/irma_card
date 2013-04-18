@@ -1,5 +1,5 @@
 /**
- * funcs_pin.c
+ * CHV.c
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,34 +17,32 @@
  * Copyright (C) Pim Vullers, Radboud University Nijmegen, May 2012.
  */
 
-#include "cardholder_verification.h"
+#include "CHV.h"
 
-#include <ISO7816.h>
-
-#include "apdu.h"
-#include "externals.h"
+#include "APDU.h"
 #include "debug.h"
+#include "externals.h"
 #include "memory.h"
 
 /**
- * Verify a PIN code
+ * Verify a PIN code.
  *
- * @param buffer which contains the code to verify
+ * @param buffer which contains the code to verify.
  */
-void pin_verify(PIN* pin, ByteArray buffer) {
+void CHV_PIN_verify(PIN* pin, ByteArray buffer) {
   // Verify if the PIN has not been blocked
   if (pin->count == 0) {
-    ReturnSW(ISO7816_SW_COUNTER_PROVIDED_BY_X(0));
+    APDU_ReturnSW(SW_COUNTER_PROVIDED_BY_X(0));
   }
 
   // Compare the PIN with the stored code
-  if (memcmp(buffer, pin->code, SIZE_PIN_MAX) != 0) {
+  if (Compare(SIZE_PIN_MAX, buffer, pin->code) != 0) {
     debugWarning("PIN verification failed");
     debugInteger("Tries left", pin->count - 1);
-    ReturnSW(ISO7816_SW_COUNTER_PROVIDED_BY_X(0) | --(pin->count));
+    APDU_ReturnSW(SW_COUNTER_PROVIDED_BY_X(0) | --(pin->count));
   } else {
     debugMessage("PIN verified ");
-    pin->count = PIN_COUNT;
+    pin->count = CHV_PIN_COUNT;
     flags |= pin->flag;
   }
 }
@@ -54,17 +52,17 @@ void pin_verify(PIN* pin, ByteArray buffer) {
  *
  * @param buffer which contains the old and new code
  */
-void pin_update(PIN* pin, ByteArray buffer) {
+void CHV_PIN_update(PIN* pin, ByteArray buffer) {
   int i;
   
   // Verify the original PIN
-  pin_verify(pin, buffer);
+  CHV_PIN_verify(pin, buffer);
 
   // Verify the new PIN size
   for (i = 0; i < pin->minSize; i++) {
-	  if (buffer[SIZE_PIN_MAX + i] == 0x00) {
-		  ReturnSW(ISO7816_SW_WRONG_LENGTH);
-	  }
+	if (buffer[SIZE_PIN_MAX + i] == 0x00) {
+      APDU_ReturnSW(SW_WRONG_LENGTH);
+    }
   }
 
   // Store the new code

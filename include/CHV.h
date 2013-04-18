@@ -1,5 +1,5 @@
 /**
- * funcs_pin.h
+ * CHV.h
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,42 +17,42 @@
  * Copyright (C) Pim Vullers, Radboud University Nijmegen, May 2012.
  */
 
-#ifndef __cardholder_verification_H
-#define __cardholder_verification_H
+#ifndef __CHV_H
+#define __CHV_H
 
 #include "externals.h"
 #include "types.h"
 
-#define PIN_COUNT 3
-#define FLAG_CARD_PIN 0x80
-#define FLAG_CRED_PIN 0x40
-#define PIN_REQUIRED 0x80
-
-
 /**
- * Verify a PIN code
+ * Verify a PIN code.
  *
- * @param buffer which contains the code to verify
+ * @param buffer which contains the code to verify.
  */
-void pin_verify(PIN* pin, ByteArray buffer);
+void CHV_PIN_verify(PIN* pin, ByteArray buffer);
 
 /**
- * Modify a PIN code
+ * Modify a PIN code.
  *
- * @param buffer which contains the old and new code
+ * @param buffer which contains the old and new code.
  */
-void pin_update(PIN* pin, ByteArray buffer);
+void CHV_PIN_update(PIN* pin, ByteArray buffer);
 
 /**
- * Whether a PIN code has been verified
+ * Whether a PIN code has been verified.
  */
-#define pin_verified(pin) ((flags & (pin).flag) != 0)
+#define CHV_verified(pin) ((flags & (pin).flag) != 0)
 
 /**
- * Whether a PIN code is required
+ * Whether a PIN code is required.
  */
-#define pin_required (((credential->userFlags.protect | credential->issuerFlags.protect) & session.prove.disclose) != 0)
+#define CHV_required (((credential->userFlags.protect | credential->issuerFlags.protect) & session.prove.disclose) != 0)
 
-#define PIN_FLAGS 0xFF00
+/**
+ * The number of tries for a PIN.
+ */
+#define CHV_PIN_COUNT 3
 
-#endif // __cardholder_verification_H
+#define CHV_FLAG_CARD_PIN 0x80
+#define CHV_FLAG_CRED_PIN 0x40
+
+#endif // __CHV_H
