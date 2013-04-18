@@ -1,113 +1,77 @@
 /**
- * funcs_debug.h
- * 
+ * debug.c
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * Copyright (C) Pim Vullers, Radboud University Nijmegen, July 2011.
  */
 
-#include "debug.h" 
+#include "debug.h"
 
 #ifdef SIMULATOR
 
-#include <stdio.h> // for printf()
-
-/********************************************************************/
-/* Debug functions                                                  */
-/********************************************************************/
-
-void debugMessage(String message) {
-  printf("[MSG] %s\n", message);
-}
-
-void debugWarning(String warning) {
-  printf("[WRN] %s\n", warning);
-}
-
-void debugError(String error) {
-  printf("[ERR] %s\n", error);
-}
-
-void debugInteger(String label, int value) {
-  printf("%s: %d\n", label, value);
-}
-
-void debugPointer(String label, const unsigned char *value) {
-  printf("%s: %p\n", label, value);
-}
-
-void debugValue(String label, const unsigned char *value, int length) {
+/**
+ * Print a value as debug output.
+ *
+ * @param label associated with the value in the output.
+ * @param value to be printed.
+ * @param length in bytes of the value.
+ */
+void debugValue(const char *label, const void *value,
+    unsigned int length) {
   int i;
 
   printf("%s: ", label);
   for (i = 0; i < length; i++) {
-    printf("%02X", value[i]);
+    printf("%02X", ((unsigned char *) value)[i]);
   }
   printf("\n");
 }
 
-void debugValueI(String label, const unsigned char *value, int length, int index) {
+/**
+ * Print an indexed value (from an array) as debug output.
+ *
+ * @param label associated with the value in the output.
+ * @param array containing the value to be printed.
+ * @param length in bytes of the values in the array.
+ * @param index of the value in the array.
+ */
+void debugIndexedValue(const char *label, const void *array,
+    unsigned int length, unsigned int index) {
   int i;
 
   printf("%s[%d]: ", label, index);
   for (i = 0; i < length; i++) {
-    printf("%02X", (value + (index * length))[i]);
+    printf("%02X", (((unsigned char *) array) + (index * length))[i]);
   }
   printf("\n");
 }
 
-void debugValues(String label, const unsigned char *value, int length, int count) {
+/**
+ * Print the values (from an array) as debug output.
+ *
+ * @param label associated with the values in the output.
+ * @param array containing the values to be printed.
+ * @param length in bytes of the values in the array.
+ * @param count number of values in the array.
+ */
+void debugValues(const char *label, const void *array,
+    unsigned int length, unsigned int count) {
   int i;
 
   for (i = 0; i < count; i++) {
-    debugValueI(label, value, length, i);
-  }
-}
-
-void debugNumberI(String label, Numbers value, int index) {
-  int i;
-
-  printf("%s[%d]: ", label, index);
-  for (i = 0; i < SIZE_N; i++) {
-    printf("%02X", value[index][i]);
-  }
-  printf("\n");
-}
-
-void debugNumbers(String label, Numbers value, int count) {
-  int i;
-
-  for (i = 0; i < count; i++) {
-    debugNumberI(label, value, i);
-  }
-}
-
-void debugCLMessageI(String label, CLMessages value, int index) {
-  int i;
-
-  printf("%s[%d]: ", label, index);
-  for (i = 0; i < SIZE_M; i++) {
-    printf("%02X", value[index][i]);
-  }
-  printf("\n");
-}
-
-void debugCLMessages(String label, CLMessages value, int count) {
-  int i;
-
-  for (i = 0; i < count; i++) {
-    debugCLMessageI(label, value, i);
+    debugIndexedValue(label, array, length, i);
   }
 }
 
