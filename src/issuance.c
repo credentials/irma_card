@@ -22,14 +22,15 @@
 #include <ISO7816.h>
 
 #include "apdu.h"
+#include "arithmetic.h"
+#include "debug.h"
 #include "externals.h"
+#include "memory.h"
+#include "random.h"
 #include "sizes.h"
 #include "types.h"
-#include "debug.h"
+#include "types.debug.h"
 #include "utils.h"
-#include "random.h"
-#include "memory.h"
-#include "arithmetic.h"
 
 /********************************************************************/
 /* Issuing functions                                                */
@@ -164,31 +165,27 @@ void constructSignature(void) {
 void verifySignature(void) {
   Byte i;
 
+  // Clear the memory before starting computations
+  ClearBytes(sizeof(IssuanceSignatureVerification), public.base);
+
   // Compute Ri = R[i]^m[i] mod n forall i
-  ModExpSecure(SIZE_M, SIZE_N, masterSecret, credential->issuerKey.n,
-    credential->issuerKey.R[0], public.vfySig.ZPrime);
+  ModExpSecure(SIZE_M, SIZE_N, masterSecret, credential->issuerKey.n, credential->issuerKey.R[0], public.vfySig.ZPrime);
   debugNumber("Z' = R[0]^ms mod n", public.vfySig.ZPrime);
-  for (i = 1; i <= credential->size; ++i) {
-    ModExp(SIZE_M, SIZE_N, credential->attribute[i - 1], credential->issuerKey.n,
-      credential->issuerKey.R[i], public.vfySig.buffer);
+  for (i = 0; i < credential->size; i++) {
+    ModExp(SIZE_M, SIZE_N, credential->attribute[i], credential->issuerKey.n, credential->issuerKey.R[i + 1], public.vfySig.buffer);
     debugNumber("buffer = R[i]^m[i] mod n", public.vfySig.buffer);
-    ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer,
-      credential->issuerKey.n);
+    ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer, credential->issuerKey.n);
     debugNumber("Z' = Z' * buffer mod n", public.vfySig.ZPrime);
   }
 
   // Compute Z' = A^e * S^v * Ri mod n
-  ModExpSpecial(SIZE_V, credential->signature.v,
-    public.vfySig.buffer, public.vfySig.tmp);
+  ModExpSpecial(SIZE_V, credential->signature.v, public.vfySig.buffer, public.vfySig.tmp);
   debugNumber("buffer = S^v mod n", public.vfySig.buffer);
-  ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer,
-    credential->issuerKey.n);
+  ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer, credential->issuerKey.n);
   debugNumber("Z' = Z' * buffer mod n", public.vfySig.ZPrime);
-  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n,
-    credential->signature.A, public.vfySig.buffer);
+  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, public.vfySig.buffer);
   debugNumber("buffer = A^e mod n", public.vfySig.buffer);
-  ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer,
-    credential->issuerKey.n);
+  ModMul(SIZE_N, public.vfySig.ZPrime, public.vfySig.buffer, credential->issuerKey.n);
   debugNumber("Z' = Z' * buffer mod n", public.vfySig.ZPrime);
 
   // - Verify Z =?= Z'

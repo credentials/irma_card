@@ -114,6 +114,7 @@ void ModExpSpecial(int size, ByteArray exponent, ByteArray result, ByteArray buf
  */
 void ClearBytes(int size, ByteArray buffer) {
   while (size > 255) {
+//    __code(CLEARN, buffer, 255);
     __push(buffer);
     __code(PUSHZ, 255);
     __code(STOREI, 255);

@@ -25,17 +25,18 @@
 #include <ISO7816.h> // for APDU constants
 
 #include "apdu.h"
-#include "sizes.h"
-#include "types.h"
+#include "cardholder_verification.h"
 #include "debug.h"
 #include "encoding.h"
-#include "cardholder_verification.h"
-#include "utils.h"
+#include "issuance.h"
 #include "memory.h"
 #include "random.h"
-#include "issuance.h"
-#include "verification.h"
 #include "secure_messaging.h"
+#include "sizes.h"
+#include "types.h"
+#include "types.debug.h"
+#include "utils.h"
+#include "verification.h"
 
 /********************************************************************/
 /* Public segment (APDU buffer) variable declaration                */
@@ -357,7 +358,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_P1P2);
               }
               Copy(SIZE_N, credential->issuerKey.R[P2], public.apdu.data);
-              debugNumberI("Initialised isserKey.R", credential->issuerKey.R, P2);
+              debugIndexedNumber("Initialised isserKey.R", credential->issuerKey.R, P2);
               break;
 
             default:
@@ -387,7 +388,7 @@ void main(void) {
           }
 
           Copy(SIZE_M, credential->attribute[P1 - 1], public.apdu.data);
-          debugCLMessageI("Initialised attribute", credential->attribute, P1 - 1);
+          debugIndexedCLMessage("Initialised attribute", credential->attribute, P1 - 1);
           ReturnSW(ISO7816_SW_NO_ERROR);
 
         case INS_ISSUE_COMMITMENT:
@@ -591,13 +592,8 @@ void main(void) {
                 ReturnSW(ISO7816_SW_SECURITY_STATUS_NOT_SATISFIED);
               }
 
-#ifndef SIMULATOR
               Copy(SIZE_H, public.prove.context, public.verificationSetup.context);
               debugHash("Initialised context", public.prove.context);
-#else // SIMULATOR
-              Copy(SIZE_H, session.prove.context, public.verificationSetup.context);
-              debugHash("Initialised context", session.prove.context);
-#endif // SIMULATOR
 
               // Create new log entry
               log_new_entry();
@@ -644,11 +640,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-#ifndef SIMULATOR
               Copy(SIZE_N, public.apdu.data, public.prove.APrime);
-#else // SIMULATOR
-              Copy(SIZE_N, public.apdu.data, session.prove.APrime);
-#endif // SIMULATOR
               debugNumber("Returned A'", public.apdu.data);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_N);
 
@@ -658,11 +650,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-#ifndef SIMULATOR
               Copy(SIZE_E_, public.apdu.data, public.prove.eHat);
-#else // SIMULATOR
-              Copy(SIZE_E_, public.apdu.data, session.prove.eHat);
-#endif // SIMULATOR
               debugValue("Returned e^", public.apdu.data, SIZE_E_);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_E_);
 
@@ -672,11 +660,7 @@ void main(void) {
                 ReturnSW(ISO7816_SW_WRONG_LENGTH);
               }
 
-#ifndef SIMULATOR
               Copy(SIZE_V_, public.apdu.data, public.prove.vHat);
-#else // SIMULATOR
-              Copy(SIZE_V_, public.apdu.data, session.prove.vHat);
-#endif // SIMULATOR
               debugValue("Returned v^", public.apdu.data, SIZE_V_);
               ReturnLa(ISO7816_SW_NO_ERROR, SIZE_V_);
 

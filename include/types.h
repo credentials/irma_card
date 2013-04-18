@@ -22,7 +22,9 @@
 
 #include "sizes.h"
 
-#define NULL 0x0000
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
 
 typedef unsigned int uint;
 typedef uint Size;
@@ -114,101 +116,111 @@ typedef struct {
 #define ACTION_PROVE 0x02;
 #define ACTION_REMOVE 0x03;
 
+typedef struct {
+  Byte data[255]; // 255
+  Byte session[SIZE_PUBLIC - 255]; // SIZE_PUBLIC - 255
+} APDU; // SIZE_PUBLIC
+
+typedef struct {
+  CredentialIdentifier id;
+  Hash context;
+  Size size;
+  CredentialFlags flags;
+  Byte timestamp[SIZE_TIMESTAMP];
+} IssuanceSetup;
+
+typedef struct {
+  Number U; // 128
+  union {
+    Byte data[SIZE_BUFFER_C1]; // 307
+    Number number[3]; // 384
+  } buffer; // 384
+  Value list[5]; // 20
+  Nonce nonce; // 10
+} IssuanceCommitment; // 128 + 384 + 20 + 10 = 542
+
+typedef struct {
+  Hash challenge; // 32
+  Byte sHat[SIZE_S_]; // 75
+  Byte vPrime[SIZE_VPRIME]; // 138
+  ResponseVPRIME vPrimeHat; // 180
+} IssuanceSession; // 32 + 75 + 138 + 180 = 425
+
+typedef struct {
+  Number ZPrime; // 128
+  Number buffer; // 128
+  Number tmp; // 128
+} IssuanceSignatureVerification; // 384
+
+typedef struct {
+  Byte buffer[SIZE_BUFFER_C2]; // 438
+} IssuanceProofVerification; // 438
+
+typedef struct {
+  Value list[5]; // 20
+  Hash challenge; // 32
+  Number Q; // 128
+  Number AHat; // 128
+} IssuanceProofSession; // 20 + 32 + 128 + 128 = 308
+
+typedef struct {
+  CredentialIdentifier id;
+  Hash context;
+  AttributeMask selection;
+  Byte timestamp[SIZE_TIMESTAMP];
+  Byte terminal[SIZE_TERMINAL_ID];
+} VerificationSetup;
+
+typedef struct {
+  union {
+    Nonce nonce; // 10
+    Hash challenge; // 20
+  } apdu; // 20
+  union {
+    Byte data[SIZE_BUFFER_C1]; // 319
+    Number number[2]; // 256
+  } buffer; // 319
+  Hash context; // 20
+  Value list[4]; // 16
+  Byte rA[SIZE_R_A]; // 138
+  Number APrime; // 128
+  ResponseV vHat; // 231
+  ResponseE eHat; // 45
+} VerificationProof; // 20 + 307 + 20 + 16 + 138 + 128 + 231 + 45 = 905
+
+typedef struct {
+  ResponseM mHat[SIZE_L]; // 74*6 (444)
+  AttributeMask disclose; // 2
+} VerificationSession; // 444 + 2 = 446 (444 + 2 + 32 + 128 + 255 + 57 = 918)
+
+typedef struct {
+  CredentialFlags user;
+  CredentialFlags issuer;
+} AdminFlags;
+
 typedef union {
   Byte base[1];
 
-  struct {
-    Byte data[255]; // 255
-    Byte session[SIZE_PUBLIC - 255]; // SIZE_PUBLIC - 255
-  } apdu; // SIZE_PUBLIC
+  APDU apdu;
 
-  struct {
-    CredentialIdentifier id;
-    Hash context;
-    AttributeMask selection;
-    Byte timestamp[SIZE_TIMESTAMP];
-    Byte terminal[SIZE_TERMINAL_ID];
-  } verificationSetup;
+  IssuanceSetup issuanceSetup;
+  IssuanceCommitment issue;
+  IssuanceSignatureVerification vfySig;
+  IssuanceProofVerification vfyPrf;
 
-  struct {
-    union {
-      Nonce nonce; // 10
-      Hash challenge; // 20
-    } apdu; // 20
-    union {
-      Byte data[SIZE_BUFFER_C1]; // 319
-      Number number[2]; // 256
-    } buffer; // 319
-    Hash context; // 20
-    Value list[4]; // 16
-    Byte rA[SIZE_R_A]; // 138
-    Number APrime; // 128
-    ResponseV vHat; // 231
-    ResponseE eHat; // 45
-  } prove; // 20 + 307 + 20 + 16 + 138 + 128 + 231 + 45 = 905
+  VerificationSetup verificationSetup;
+  VerificationProof prove;
 
-  struct {
-    CredentialIdentifier id;
-    Hash context;
-    Size size;
-    CredentialFlags flags;
-    Byte timestamp[SIZE_TIMESTAMP];
-  } issuanceSetup;
-
-  struct {
-    Number U; // 128
-    union {
-      Byte data[SIZE_BUFFER_C1]; // 307
-      Number number[3]; // 384
-    } buffer; // 384
-    Value list[5]; // 20
-    Nonce nonce; // 10
-  } issue; // 128 + 384 + 20 + 10 = 542
-
-  struct {
-    Number ZPrime; // 128
-    Number buffer; // 128
-    Number tmp; // 128
-  } vfySig; // 384
-
-  struct {
-    Byte buffer[SIZE_BUFFER_C2]; // 438
-  } vfyPrf; // 438
-
-  struct {
-    CredentialFlags user;
-    CredentialFlags issuer;
-  } adminFlags;
+  AdminFlags adminFlags;
 } PublicData;
 
 typedef union {
   Byte base[1];
 
-  struct {
-    ResponseM mHat[SIZE_L]; // 74*6 (444)
-    AttributeMask disclose; // 2
-#ifdef SIMULATOR
-    // Store values to work around the simulator clearing public
-    Hash context; // 32
-    Number APrime; // 128
-    ResponseV vHat; // 255
-    ResponseE eHat; // 57
-#endif // SIMULATOR
-  } prove; // 444 + 2 = 446 (444 + 2 + 32 + 128 + 255 + 57 = 918)
+  IssuanceSession issue;
+  IssuanceProofSession vfyPrf;
 
-  struct {
-    Hash challenge; // 32
-    Byte sHat[SIZE_S_]; // 75
-    Byte vPrime[SIZE_VPRIME]; // 138
-    ResponseVPRIME vPrimeHat; // 180
-  } issue; // 32 + 75 + 138 + 180 = 425
-
-  struct {
-    Value list[5]; // 20
-    Hash challenge; // 32
-    Number Q; // 128
-    Number AHat; // 128
-  } vfyPrf; // 20 + 32 + 128 + 128 = 308
+  VerificationSession prove;
 } SessionData;
 
 #endif // __types_H
