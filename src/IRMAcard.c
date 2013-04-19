@@ -72,17 +72,17 @@ Credential credentials[MAX_CRED];
 CLMessage masterSecret;
 
 // Card holder verification: PIN
-PIN cardPIN = {
+CHV_PIN cardPIN = {
   { 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x00, 0x00 },
   SIZE_CARD_PIN,
   CHV_PIN_COUNT,
-  CHV_FLAG_CARD_PIN
+  0x80
 };
-PIN credPIN = {
+CHV_PIN credPIN = {
   { 0x30, 0x30, 0x30, 0x30, 0x00, 0x00, 0x00, 0x00 },
   SIZE_CRED_PIN,
   CHV_PIN_COUNT,
-  CHV_FLAG_CRED_PIN
+  0x40
 };
 
 // Card authentication: private key and modulus

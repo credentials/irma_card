@@ -20,39 +20,49 @@
 #ifndef __CHV_H
 #define __CHV_H
 
-#include "externals.h"
-#include "types.h"
-
 /**
- * Verify a PIN code.
- *
- * @param buffer which contains the code to verify.
+ * The maximum size of a PIN.
  */
-void CHV_PIN_verify(PIN* pin, ByteArray buffer);
-
-/**
- * Modify a PIN code.
- *
- * @param buffer which contains the old and new code.
- */
-void CHV_PIN_update(PIN* pin, ByteArray buffer);
-
-/**
- * Whether a PIN code has been verified.
- */
-#define CHV_verified(pin) ((flags & (pin).flag) != 0)
-
-/**
- * Whether a PIN code is required.
- */
-#define CHV_required (((credential->userFlags.protect | credential->issuerFlags.protect) & session.prove.disclose) != 0)
+#define CHV_PIN_SIZE 8
 
 /**
  * The number of tries for a PIN.
  */
 #define CHV_PIN_COUNT 3
 
-#define CHV_FLAG_CARD_PIN 0x80
-#define CHV_FLAG_CRED_PIN 0x40
+extern unsigned char CHV_flags;
+
+
+typedef struct {
+  unsigned char code[CHV_PIN_SIZE];
+  unsigned char minSize;
+  unsigned char count;
+  unsigned char flag;
+} CHV_PIN;
+
+/**
+ * Verify a PIN code.
+ *
+ * @param buffer which contains the code to verify.
+ */
+void CHV_PIN_verify(CHV_PIN* pin, unsigned char *buffer);
+
+/**
+ * Modify a PIN code.
+ *
+ * @param buffer which contains the old and new code.
+ */
+void CHV_PIN_update(CHV_PIN* pin, unsigned char *buffer);
+
+
+/**
+ * Whether a PIN code has been verified.
+ */
+#define CHV_verified(pin) ((CHV_flags & (pin).flag) != 0)
+
+/**
+ * Whether a PIN code is required.
+ */
+#define CHV_required (((credential->userFlags.protect | credential->issuerFlags.protect) & session.prove.disclose) != 0)
 
 #endif // __CHV_H

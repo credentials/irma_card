@@ -93,13 +93,6 @@ typedef struct {
 } Credential;
 
 typedef struct {
-  Byte code[SIZE_PIN_MAX];
-  Byte minSize;
-  Byte count;
-  Byte flag;
-} PIN;
-
-typedef struct {
   Byte timestamp[SIZE_TIMESTAMP];
   Byte terminal[SIZE_TERMINAL_ID];
   Byte action;

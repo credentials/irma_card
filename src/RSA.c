@@ -39,7 +39,7 @@ static void MGF1(unsigned int seed_bytes, unsigned char *seed, unsigned int mask
 
   while (i < n - 1 /* exclude the last block */) {
     // Prepare hash data
-    Copy(sizeof(unsigned int), seed + seed_bytes + (4 - sizeof(unsigned int)), &i);
+    Copy(sizeof(unsigned int), seed + seed_bytes + (4 - sizeof(unsigned int)), (unsigned char *) &i);
 
     // Compute hash
     SHA(RSA_SHA_BYTES, hash, seed_bytes + 4, seed);
@@ -52,7 +52,7 @@ static void MGF1(unsigned int seed_bytes, unsigned char *seed, unsigned int mask
   }
   
   // Prepare hash data
-  Copy(sizeof(unsigned int), seed + seed_bytes + (4 - sizeof(unsigned int)), &i);
+  Copy(sizeof(unsigned int), seed + seed_bytes + (4 - sizeof(unsigned int)), (unsigned char *) &i);
 
   // Compute hash
   SHA(RSA_SHA_BYTES, hash, seed_bytes + 4, seed);
@@ -135,7 +135,7 @@ int OAEP_decode(unsigned char *m, unsigned int em_bytes, const unsigned char *em
   debugValue("OAEP decode: hash of label", seed, RSA_SHA_BYTES);
 
   // Check whether the first RSA_SHA_BYTES bytes of DB equal to lHash
-  if (Compare(RSA_SHA_BYTES, seed, DB) != 0) {
+  if (NotEqual(RSA_SHA_BYTES, seed, DB)) {
 	debugError("First RSA_SHA_BYTES of DB do not match with hash of label");
     return RSA_ERROR_OAEP_DECODE;
   }
@@ -237,7 +237,7 @@ int PSS_verify(unsigned int m_bytes, const unsigned char *m, unsigned int em_byt
   SHA(RSA_SHA_BYTES, DB, 8 + RSA_SHA_BYTES + RSA_SALT_BYTES, M);
   debugValue("PSS verify: hash of recovered message to be encoded", DB, RSA_SHA_BYTES);
 
-  if (Compare(RSA_SHA_BYTES, em + RSA_MOD_BYTES - RSA_SHA_BYTES - 1, DB) != 0) {
+  if (NotEqual(RSA_SHA_BYTES, em + RSA_MOD_BYTES - RSA_SHA_BYTES - 1, DB)) {
     return RSA_ERROR_PSS_INCONSISTENT;
   }
 

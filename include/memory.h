@@ -22,7 +22,7 @@
 
 #include "MULTOS.h"
 
-#include <string.h> // for memcmp
+#include <string.h> // for memcmp, memset
 
 #define CopyFlex CopyNonAtomic
 #define CopyFixed CopyFixedNonAtomic
@@ -33,35 +33,60 @@
 #define CopyAtomic(bytes, dest, src) \
 do { \
   __push(__typechk(unsigned int, bytes)); \
-  __push(dest); \
-  __push(src); \
+  __push((void *)(dest)); \
+  __push((void *)(src)); \
   __code(PRIM, PRIM_COPY); \
 } while (0)
 
 #define CopyNonAtomic(bytes, dest, src) \
 do { \
   __push(__typechk(unsigned int, bytes)); \
-  __push(dest); \
-  __push(src); \
+  __push((void *)(dest)); \
+  __push((void *)(src)); \
   __code(PRIM, PRIM_COPY_NON_ATOMIC); \
 } while (0)
   
 #define CopyFixedAtomic(bytes, dest, src) \
 do { \
-  __push(dest); \
-  __push(src); \
+  __push((void *)(dest)); \
+  __push((void *)(src)); \
   __code(PRIM, PRIM_COPY_FIXED, bytes); \
 } while (0)
 
 #define CopyFixedNonAtomic(bytes, dest, src) \
 do { \
-  __push(dest); \
-  __push(src); \
+  __push((void *)(dest)); \
+  __push((void *)(src)); \
   __code(PRIM, PRIM_COPY_FIXED_NON_ATOMIC, bytes); \
 } while (0)
 
+
 #define Compare(bytes, x, y) \
   memcmp(x, y, bytes)
+
+/**
+ * Equal (x == y)
+ */
+#define Equal(bytes, x, y) \
+  (Compare(bytes, x, y) == 0)
+
+/**
+ * NotEqual (x != y)
+ */
+#define NotEqual(bytes, x, y) \
+  (Compare(bytes, x, y) != 0)
+
+/**
+ * Smaller (x < y)
+ */
+#define Smaller(bytes, x, y) \
+  (Compare(bytes, x, y) < 0)
+
+/**
+ * Larger (x > y)
+ */
+#define Larger(bytes, x, y) \
+  (Compare(bytes, x, y) > 0)
 
 #define Fill(bytes, array, value) \
   memset(array, value, bytes)

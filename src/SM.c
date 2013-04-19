@@ -101,7 +101,7 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer) {
 
   // Verify the MAC
   GenerateTripleDESCBCSignature(i, iv, key_mac, mac, buffer);
-  if (Compare(SIZE_MAC, mac, apdu + offset + 2) != 0) {
+  if (NotEqual(SIZE_MAC, mac, apdu + offset + 2)) {
     APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
   }
 

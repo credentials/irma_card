@@ -46,10 +46,6 @@ extern Byte rsaModulus[SIZE_RSA_MODULUS];
 // Secure messaging: initialisation vector
 extern Byte iv[SIZE_IV];
 
-// Card holder verification: PIN
-extern PIN cardPIN;
-extern PIN credPIN;
-
 // Logging
 extern LogEntry *log;
 

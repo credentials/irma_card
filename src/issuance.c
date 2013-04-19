@@ -189,7 +189,7 @@ void verifySignature(void) {
   }
 
   // Verify Z =?= Z'
-  if (Compare(SIZE_N, credential->issuerKey.Z, session.vfySig.ZPrime) != 0) {
+  if (NotEqual(SIZE_N, credential->issuerKey.Z, session.vfySig.ZPrime)) {
     // TODO: clear already stored things?
     debugError("verifySignature(): verification of signature failed");
     APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
@@ -238,7 +238,7 @@ void verifyProof(void) {
   debugHash("c'", session.vfyPrf.challenge);
 
   // Verify c =?= c'
-  if (Compare(SIZE_H, credential->proof.challenge, session.vfyPrf.challenge) != 0) {
+  if (NotEqual(SIZE_H, credential->proof.challenge, session.vfyPrf.challenge)) {
     // TODO: clear already stored things?
     debugError("verifyProof(): verification of P2 failed");
     APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
