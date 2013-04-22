@@ -77,7 +77,7 @@ void ComputeS_(void) {
   // Compute S_ = S^(2_l)
   ModExp(SIZE_S_EXPONENT, SIZE_N, public.issue.buffer.data,
     credential->issuerKey.n, credential->issuerKey.S, credential->issuerKey.S_);
-  ModMul(SIZE_N, credential->issuerKey.S_, credential->issuerKey.S, 
+  ModMul(SIZE_N, credential->issuerKey.S_, credential->issuerKey.S,
     credential->issuerKey.n);
 }
 
@@ -112,16 +112,18 @@ void ModExpSpecial(int size, ByteArray exponent, ByteArray result, ByteArray buf
  * @param size the amount of bytes to clear
  * @param buffer to be cleared
  */
-void ClearBytes(int size, ByteArray buffer) {
+void ClearBytes(int size, void *buffer) {
+  int offset = 0;
+
   while (size > 255) {
 //    __code(CLEARN, buffer, 255);
-    __push(buffer);
+    __push(((unsigned char *) buffer) + offset);
     __code(PUSHZ, 255);
     __code(STOREI, 255);
-    buffer += 255;
+    offset += 255;
     size -= 255;
   }
-  Fill(size, buffer, 0x00);
+  Fill(size, ((unsigned char *) buffer) + offset, 0x00);
 }
 
 /**

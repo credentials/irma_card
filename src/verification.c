@@ -70,7 +70,7 @@ void selectAttributes(int selection) {
  * Construct a proof.
  */
 void constructProof(void) {
-  int i;
+  unsigned char i;
 
   // Generate random values for m~[i], e~, v~ and rA
   for (i = 0; i <= credential->size; i++) {
@@ -79,7 +79,7 @@ void constructProof(void) {
       RandomBits(session.prove.mHat[i], LENGTH_M_ - 1);
     }
   }
-  debugValues("mTilde", (ByteArray) session.prove.mHat, SIZE_M_, SIZE_L);
+  debugValues("mTilde", session.prove.mHat, SIZE_M_, SIZE_L);
   // IMPORTANT: Correction to the length of eTilde to prevent overflows
   RandomBits(public.prove.eHat, LENGTH_E_ - 1);
   debugValue("eTilde", public.prove.eHat, SIZE_E_);
@@ -88,6 +88,7 @@ void constructProof(void) {
   debugValue("vTilde", public.prove.vHat, SIZE_V_);
   // IMPORTANT: Correction to the length of rA to prevent negative values
   RandomBits(public.prove.rA + 1, LENGTH_R_A - 13);
+  public.prove.rA[0] = 0x00; // Set first byte of rA, since it's not set by RandomBits command
   debugValue("rA", public.prove.rA, SIZE_R_A);
 
   // Compute A' = A * S^r_A

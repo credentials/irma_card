@@ -60,7 +60,7 @@ void ModExpSpecial(int size, ByteArray exponent, ByteArray result, ByteArray buf
  * @param size the amount of bytes to clear
  * @param buffer to be cleared
  */
-void ClearBytes(int size, ByteArray buffer);
+void ClearBytes(int size, void *buffer);
 
 /**
  * Clear the current credential.

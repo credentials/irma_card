@@ -575,6 +575,9 @@ void main(void) {
             APDU_ReturnSW(SW_WRONG_P1P2);
           }
 
+		  // Cleanup session
+		  ClearBytes(sizeof(VerificationSession), &(session.prove));
+
           // FIXME: should be done during auth.
           Copy(SIZE_TERMINAL_ID, terminal, public.verificationSetup.terminal);
 
