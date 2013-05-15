@@ -20,7 +20,8 @@
 #ifndef __authentication_H
 #define __authentication_H
 
-#include "types.h"
+#include "RSA.h"
 
+void authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert);
 
 #endif // __authentication_H

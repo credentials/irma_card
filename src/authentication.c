@@ -19,12 +19,46 @@
 
 #include "authentication.h"
 
+#include "APDU.h"
+#include "encoding.h"
 #include "externals.h"
 #include "debug.h"
 #include "memory.h"
 #include "random.h"
 #include "SHA.h"
 #include "RSA.h"
+
+void authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert) {
+  const unsigned char *body;
+  unsigned char *signature;
+  int body_bytes, signature_bytes;
+  unsigned int offset = 0;
+
+  if (cert[offset++] != 0x7F || cert[offset++] != 0x21) {
+	  APDU_ReturnSW(SW_WRONG_DATA);
+  }
+  asn1_decode_length(cert, &offset);
+  body = cert + offset;
+  if (cert[offset++] != 0x7F || cert[offset++] != 0x4E) {
+	  APDU_ReturnSW(SW_WRONG_DATA);
+  }
+  body_bytes = asn1_decode_length(cert, &offset);
+  if (body_bytes < 0) {
+	  APDU_ReturnSW(SW_WRONG_DATA);
+  }
+  offset += body_bytes;
+  body_bytes = cert + offset - body;
+
+  if (cert[offset++] != 0x5F || cert[offset++] != 0x37) {
+	  APDU_ReturnSW(SW_WRONG_DATA);
+  }
+  signature_bytes = asn1_decode_length(cert, &offset);
+  signature = cert + offset;
+
+  if (RSA_PSS_verify(key, body_bytes, body, signature_bytes, signature) < 0) {
+	APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+  }
+}
 
 /**
  * Derive session key from a given key seed and mode
@@ -71,20 +105,3 @@ void deriveSessionKeys(void) {
   Copy(4, ssc + 4, seed + SIZE_KEY_SEED + 4 + SIZE_KEY);
 }
 #undef seed
-
-#define buffer public.apdu.data
-void crypto_authenticate_card(void) {
-  // Decrypt the session key seed input from the terminal
-//  RSA_OAEP_Decrypt(SIZE_RSA_EXPONENT, SIZE_RSA_MODULUS,
-//    rsaExponent, rsaModulus, buffer, buffer + SIZE_RSA_MODULUS);
-
-  // Generate the session key seed input from the card
-  RandomBits(buffer, LENGTH_KEY_SEED_CARD);
-
-  // Derive the session keys
-  deriveSessionKeys();
-
-  // Clean up intermediate results
-  Clear(SIZE_KEY_SEED_TERMINAL + 4 + SIZE_H, buffer + SIZE_KEY_SEED_CARD);
-}
-#undef buffer

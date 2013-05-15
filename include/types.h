@@ -191,11 +191,18 @@ typedef struct {
   CredentialFlags issuer;
 } AdminFlags;
 
+typedef struct {
+  Byte apdu[255];
+  Byte cert[768];
+  unsigned int offset;
+} CertificateVerification;
+
 typedef union {
   Byte base[1];
 
   APDU apdu;
 
+  CertificateVerification vfyCert;
   IssuanceSetup issuanceSetup;
   IssuanceCommitment issue;
   IssuanceProofVerification vfyPrf;
