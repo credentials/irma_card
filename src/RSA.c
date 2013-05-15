@@ -44,11 +44,11 @@ static void MGF1(unsigned int seed_bytes, unsigned char *seed, unsigned int mask
     // Compute hash
     SHA(RSA_SHA_BYTES, hash, seed_bytes + 4, seed);
 
-	// Append hash to mask
-	Copy(RSA_SHA_BYTES, mask + i * RSA_SHA_BYTES, hash);
+	  // Append hash to mask
+	  Copy(RSA_SHA_BYTES, mask + i * RSA_SHA_BYTES, hash);
 	
-	// Next block
-	++i;
+	  // Next block
+	  ++i;
   }
   
   // Prepare hash data

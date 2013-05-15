@@ -29,11 +29,11 @@
 #endif // !RSA_MOD_BITS
 
 #ifndef RSA_SHA_BITS
-  #define RSA_SHA_BITS SHA_256_BITS
+  #define RSA_SHA_BITS SHA_1_BITS
 #endif // !RSA_SHA_BITS
 
 #ifndef RSA_SALT_BITS
-  #define RSA_SALT_BITS SHA_256_BITS
+  #define RSA_SALT_BITS SHA_1_BITS
 #endif // !RSA_SALT_BITS
 
 #define RSA_BITS_TO_BYTES(bits) ((bits + 7) /8)
