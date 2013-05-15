@@ -22,7 +22,7 @@
 
 // Attribute and credential definitions
 #define MAX_ATTR      5
-#define MAX_CRED      8
+#define MAX_CRED      10
 
 // System parameter lengths
 #define LENGTH_N      1024
