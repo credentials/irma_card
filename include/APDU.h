@@ -26,6 +26,8 @@
  * CLAss bytes
  */
 #define CLA_ISO7816                0x00
+#define CLA_SECURE_MESSAGING       0x0C
+#define CLA_COMMAND_CHAINING       0x10
 #define CLA_IRMACARD               0x80
 
 /*
@@ -36,6 +38,8 @@
 #define INS_INTERNAL_AUTHENTICATE  0x88
 #define INS_GET_RESPONSE           0xC0
 #define INS_CHANGE_REFERENCE_DATA  0x24
+#define INS_MANAGE_SECURITY_ENVIRONMENT 0x22
+#define INS_PERFORM_SECURITY_OPERATION 0x2A
 
 #define INS_GENERATE_SECRET        0x01
 #define INS_AUTHENTICATION_SECRET  0x02
@@ -118,9 +122,13 @@
 #define SW_UNKNOWN                        0x6F00
 #define SW_NO_ERROR		                  0x9000
 
+#define TAG_ISO7816_FCI          0x6F
+#define TAG_PROPRIETARY_INFO     0x85
+#define TAG_PROPRIETARY_SECURITY 0x86
+#define TAG_PROPRIETARY_INFO_TLV 0xA5
 
-#define APDU_wrapped ((CLA & 0x0C) != 0)
-#define APDU_chained ((CLA & 0x10) != 0)
+#define APDU_wrapped ((CLA & CLA_SECURE_MESSAGING) != 0)
+#define APDU_chained ((CLA & CLA_COMMAND_CHAINING) != 0)
 
 #define APDU_ReturnSW(sw) \
   __SW = (sw); \
