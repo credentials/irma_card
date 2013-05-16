@@ -103,7 +103,7 @@ typedef struct {
     } prove;
     Byte data[5];
   } details;
-} LogEntry;
+} IRMALogEntry;
 
 #define ACTION_ISSUE 0x01;
 #define ACTION_PROVE 0x02;

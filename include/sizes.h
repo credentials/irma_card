@@ -81,7 +81,6 @@
 #define SIZE_CRED_PIN 4
 #define SIZE_CARD_PIN 6
 
-#define SIZE_LOG 30
 #define SIZE_TERMINAL_ID 4
 #define SIZE_TIMESTAMP 4
 #define SIZE_FLAGS 2

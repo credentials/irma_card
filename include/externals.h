@@ -39,14 +39,7 @@ extern Byte ssc[SIZE_SSC];
 extern Byte key_enc[SIZE_KEY];
 extern Byte key_mac[SIZE_KEY];
 
-// Card authentication: private key and modulus
-extern Byte rsaExponent[SIZE_RSA_EXPONENT];
-extern Byte rsaModulus[SIZE_RSA_MODULUS];
-
 // Secure messaging: initialisation vector
 extern Byte iv[SIZE_IV];
-
-// Logging
-extern LogEntry *log;
 
 #endif // __externals_H

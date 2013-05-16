@@ -143,7 +143,7 @@ void constructProof(void) {
       crypto_compute_mHat(i); // Compute m_i^ = m_i~ + c m_i
     }
   }
-  debugValues("mHat", (ByteArray) session.prove.mHat, SIZE_M_, SIZE_L);
+  debugValues("mHat", session.prove.mHat, SIZE_M_, SIZE_L);
 
   // return eHat, vHat, mHat[i], c, A'
 }

@@ -20,19 +20,21 @@
 // Name everything "IRMAcard"
 #pragma attribute("aid", "49 52 4D 41 63 61 72 64")
 #pragma attribute("dir", "61 10 4f 6 69 64 65 6D 69 78 50 6 69 64 65 6D 69 78")
-#pragma attribute("fci", "49 00 07 02")
+#pragma attribute("fci", "6F 08 A5 06 04 04 49 00 07 03")
 
-#include "APDU.h"
-#include "CHV.h"
-#include "debug.h"
-#include "encoding.h"
-#include "issuance.h"
-#include "memory.h"
-#include "random.h"
-#include "SM.h"
-#include "sizes.h"
 #include "types.h"
 #include "types.debug.h"
+#include "APDU.h"
+#include "authentication.h"
+#include "CHV.h"
+#include "debug.h"
+#include "issuance.h"
+#include "memory.h"
+#include "logging.h"
+#include "random.h"
+#include "RSA.h"
+#include "SM.h"
+#include "sizes.h"
 #include "utils.h"
 #include "verification.h"
 
@@ -85,18 +87,16 @@ CHV_PIN credPIN = {
   0x40
 };
 
-// Card authentication: private key and modulus
-Byte rsaExponent[SIZE_RSA_EXPONENT];
-Byte rsaModulus[SIZE_RSA_MODULUS];
+// Authentication
+RSA_public_key cardKey;
+RSA_public_key caKey;
 
 // Secure messaging: initialisation vector
 Byte iv[SIZE_IV];
 
 // Logging
-LogEntry *log;
-LogEntry logList[SIZE_LOG];
-Byte logHead = 0;
-
+Log log;
+IRMALogEntry *logEntry;
 
 /********************************************************************/
 /* APDU handling                                                    */
@@ -114,7 +114,7 @@ void main(void) {
     debugValue("Unwrapped APDU", public.apdu.data, Lc);
   }
 
-  switch (CLA & 0xF3) {
+  switch (CLA & (0xFF ^ (CLA_SECURE_MESSAGING | CLA_COMMAND_CHAINING))) {
 
     //////////////////////////////////////////////////////////////////
     // Generic functionality                                        //
@@ -127,6 +127,28 @@ void main(void) {
         //////////////////////////////////////////////////////////////
         // Authentication                                           //
         //////////////////////////////////////////////////////////////
+
+        case INS_PERFORM_SECURITY_OPERATION:
+          if (!CheckCase(3)) {
+            APDU_ReturnSW(SW_WRONG_LENGTH);
+          }
+          if (P1P2 != 0x00BE) {
+            APDU_ReturnSW(SW_WRONG_P1P2);
+          }
+          if (public.vfyCert.offset + Lc > 768) {
+            APDU_ReturnSW(SW_COMMAND_NOT_ALLOWED);
+          }
+
+          // Add the incoming data to the buffer.
+          CopyBytes(Lc, public.vfyCert.cert + public.vfyCert.offset, public.apdu.data);
+          public.vfyCert.offset += Lc;
+
+          // Verify the certificate.
+          if (!APDU_chained) {
+          public.vfyCert.offset = 0;
+            authentication_verifyCertificate(&caKey, public.vfyCert.cert);
+          }
+          APDU_ReturnSW(SW_NO_ERROR);
 
         case INS_EXTERNAL_AUTHENTICATE:
           // Perform terminal authentication
@@ -242,22 +264,42 @@ void main(void) {
           switch (P1) {
             case P1_AUTH_EXPONENT:
               debugMessage("P1_AUTHENTICATION_EXPONENT");
-              if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_RSA_EXPONENT)) {
+              if (!((APDU_wrapped || CheckCase(3)) && Lc == RSA_EXP_BYTES)) {
                 APDU_ReturnSW(SW_WRONG_LENGTH);
               }
 
-              Copy(SIZE_RSA_EXPONENT, rsaExponent, public.apdu.data);
-              debugValue("Initialised rsaExponent", rsaExponent, SIZE_RSA_EXPONENT);
+              Copy(RSA_EXP_BYTES, cardKey.exponent, public.apdu.data);
+              debugValue("Initialised rsaExponent", cardKey.exponent, RSA_EXP_BYTES);
               break;
 
             case P1_AUTH_MODULUS:
               debugMessage("P1_AUTHENTICATION_MODULUS");
-              if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_RSA_MODULUS)) {
+              if (!((APDU_wrapped || CheckCase(3)) && Lc == RSA_MOD_BYTES)) {
                 APDU_ReturnSW(SW_WRONG_LENGTH);
               }
 
-              Copy(SIZE_RSA_EXPONENT, rsaModulus, public.apdu.data);
-              debugValue("Initialised rsaModulus", rsaModulus, SIZE_RSA_MODULUS);
+              Copy(RSA_MOD_BYTES, cardKey.modulus, public.apdu.data);
+              debugValue("Initialised rsaModulus", cardKey.modulus, RSA_MOD_BYTES);
+              break;
+
+            case P1_AUTH_EXPONENT + 2:
+              debugMessage("P1_AUTHENTICATION_EXPONENT");
+              if (!((APDU_wrapped || CheckCase(3)) && Lc == RSA_EXP_BYTES)) {
+                APDU_ReturnSW(SW_WRONG_LENGTH);
+              }
+
+              Copy(RSA_EXP_BYTES, caKey.exponent, public.apdu.data);
+              debugValue("Initialised rsaExponent", caKey.exponent, RSA_EXP_BYTES);
+              break;
+
+            case P1_AUTH_MODULUS + 2:
+              debugMessage("P1_AUTHENTICATION_MODULUS");
+              if (!((APDU_wrapped || CheckCase(3)) && Lc == RSA_MOD_BYTES)) {
+                APDU_ReturnSW(SW_WRONG_LENGTH);
+              }
+
+              Copy(RSA_MOD_BYTES, caKey.modulus, public.apdu.data);
+              debugValue("Initialised rsaModulus", caKey.modulus, RSA_MOD_BYTES);
               break;
 
             default:
@@ -303,11 +345,11 @@ void main(void) {
               debugHash("Initialised context", credential->proof.context);
 
               // Create new log entry
-              log_new_entry();
-              Copy(SIZE_TIMESTAMP, log->timestamp, public.issuanceSetup.timestamp);
-              Copy(SIZE_TERMINAL_ID, log->terminal, terminal);
-              log->action = ACTION_ISSUE;
-              log->credential = credential->id;
+              logEntry = (IRMALogEntry*) log_new_entry(&log);
+              Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.issuanceSetup.timestamp);
+              Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+              logEntry->action = ACTION_ISSUE;
+              logEntry->credential = credential->id;
 
               APDU_ReturnSW(SW_NO_ERROR);
             }
@@ -575,8 +617,8 @@ void main(void) {
             APDU_ReturnSW(SW_WRONG_P1P2);
           }
 
-		  // Cleanup session
-		  ClearBytes(sizeof(VerificationSession), &(session.prove));
+          // Cleanup session
+          ClearBytes(sizeof(VerificationSession), &(session.prove));
 
           // FIXME: should be done during auth.
           Copy(SIZE_TERMINAL_ID, terminal, public.verificationSetup.terminal);
@@ -597,12 +639,12 @@ void main(void) {
               debugHash("Initialised context", public.prove.context);
 
               // Create new log entry
-              log_new_entry();
-              Copy(SIZE_TIMESTAMP, log->timestamp, public.verificationSetup.timestamp);
-              Copy(SIZE_TERMINAL_ID, log->terminal, terminal);
-              log->action = ACTION_PROVE;
-              log->credential = credential->id;
-              log->details.prove.selection = session.prove.disclose;
+              logEntry = (IRMALogEntry*) log_new_entry(&log);
+              Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.verificationSetup.timestamp);
+              Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+              logEntry->action = ACTION_PROVE;
+              logEntry->credential = credential->id;
+              logEntry->details.prove.selection = session.prove.disclose;
 
               APDU_ReturnSW(SW_NO_ERROR);
             }
@@ -780,11 +822,11 @@ void main(void) {
             debugInteger("Removed credential", P1P2);
 
             // Create new log entry
-            log_new_entry();
-            Copy(SIZE_TIMESTAMP, log->timestamp, public.apdu.data);
-            Copy(SIZE_TERMINAL_ID, log->terminal, terminal);
-            log->action = ACTION_REMOVE;
-            log->credential = P1P2;
+            logEntry = (IRMALogEntry*) log_new_entry(&log);
+            Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.apdu.data);
+            Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+            logEntry->action = ACTION_REMOVE;
+            logEntry->credential = P1P2;
 
             APDU_ReturnSW(SW_NO_ERROR);
           }
@@ -826,8 +868,7 @@ void main(void) {
           }
 
           for (i = 0; i < 255 / sizeof(LogEntry); i++) {
-            log_get_entry(P1 + i);
-            memcpy(public.apdu.data + i*sizeof(LogEntry), log, sizeof(LogEntry));
+            memcpy(public.apdu.data + i*sizeof(LogEntry), log_get_entry(&log, P1 + i), sizeof(LogEntry));
           }
           APDU_ReturnLa(SW_NO_ERROR, (255 / sizeof(LogEntry)) * sizeof(LogEntry));
           break;

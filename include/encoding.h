@@ -34,7 +34,7 @@
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-int asn1_encode_int(ByteArray number, int length, ByteArray buffer, int offset);
+int asn1_encode_int(unsigned char *number, int length, unsigned char *buffer, int offset);
 
 /**
  * Encode the given sequence (of length bytes) into an ASN.1 DER object.
@@ -50,22 +50,22 @@ int asn1_encode_int(ByteArray number, int length, ByteArray buffer, int offset);
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-int asn1_encode_seq(int length, int size, ByteArray buffer, int offset);
+int asn1_encode_seq(int length, int size, unsigned char *buffer, int offset);
 
 /**
- * Clear size bytes from a bytearray
+ * Decode the length from a ASN.1 DER object.
  *
- * @param size the amount of bytes to clear
- * @param buffer to be cleared
+ * DER encoding rules standard (ITU-T Rec. X.690 | ISO/IEC 8825-1):
+ * http://www.itu.int/ITU-T/studygroups/com17/languages/X.690-0207.pdf
+ *
+ * Note: this function updates the offset value while decoding the
+ * length, hence in the end the offset points to the value of the ASN.1
+ * encoded DER object.
+ *
+ * @param buffer containing the DER object
+ * @param offset in the buffer at which the length should be read
+ * @return the length of the DER object in the buffer
  */
-void clear(int size, ByteArray buffer);
-
-#define log_new_entry() \
-  log = &logList[logHead]; \
-  logHead = (logHead + 1) % SIZE_LOG;
-// FIXME: CLEAR this log entry.
-
-#define log_get_entry(index) \
-  log = &logList[(2*SIZE_LOG + logHead - 1 - ((index) % SIZE_LOG)) % SIZE_LOG];
+int asn1_decode_length(const unsigned char *buffer, unsigned int *offset);
 
 #endif // __encoding_H
