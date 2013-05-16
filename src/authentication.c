@@ -28,35 +28,52 @@
 #include "SHA.h"
 #include "RSA.h"
 
-void authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert) {
-  const unsigned char *body;
-  unsigned char *signature;
+unsigned char *authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert) {
+  TLV tlv;
+  unsigned char *body, *signature;
   int body_bytes, signature_bytes;
   unsigned int offset = 0;
 
-  if (cert[offset++] != 0x7F || cert[offset++] != 0x21) {
+  ASN1_decode_tlv(&tlv, cert, &offset);
+  if (tlv.tag != 0x7F21) {
 	  APDU_ReturnSW(SW_WRONG_DATA);
   }
-  asn1_decode_length(cert, &offset);
-  body = cert + offset;
-  if (cert[offset++] != 0x7F || cert[offset++] != 0x4E) {
+  body = tlv.value;
+  offset = tlv.value - cert;
+
+  ASN1_decode_tlv(&tlv, cert, &offset);
+  if (tlv.tag != 0x7F4E) {
 	  APDU_ReturnSW(SW_WRONG_DATA);
   }
-  body_bytes = asn1_decode_length(cert, &offset);
-  if (body_bytes < 0) {
-	  APDU_ReturnSW(SW_WRONG_DATA);
-  }
-  offset += body_bytes;
   body_bytes = cert + offset - body;
 
-  if (cert[offset++] != 0x5F || cert[offset++] != 0x37) {
+  ASN1_decode_tlv(&tlv, cert, &offset);
+  if (tlv.tag != 0x5F37) {
 	  APDU_ReturnSW(SW_WRONG_DATA);
   }
-  signature_bytes = asn1_decode_length(cert, &offset);
-  signature = cert + offset;
+  signature_bytes = tlv.length;
+  signature = tlv.value;
 
   if (RSA_PSS_verify(key, body_bytes, body, signature_bytes, signature) < 0) {
-	APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+    APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+  }
+
+  return body;
+}
+
+void authentication_parseCertificate(unsigned char *cert) {
+  unsigned int offset = 0;
+
+}
+
+void authentication_generateChallenge(RSA_public_key *key, unsigned char *nonce, unsigned char *challenge) {
+  RandomBytes(nonce, AUTH_CHALLENGE_BYTES);
+  RSA_OAEP_encrypt(challenge, key, AUTH_CHALLENGE_BYTES, nonce, 0, NULL);
+}
+
+void authentication_authenticateTerminal(unsigned char *response, unsigned char *nonce) {
+  if (NotEqual(AUTH_CHALLENGE_BYTES, response, nonce)) {
+    APDU_ReturnSW(SW_WRONG_DATA);
   }
 }
 

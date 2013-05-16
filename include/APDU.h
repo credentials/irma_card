@@ -34,6 +34,7 @@
  * INStruction bytes
  */
 #define INS_VERIFY                 0x20
+#define INS_GET_CHALLENGE          0xB4
 #define INS_EXTERNAL_AUTHENTICATE  0x82
 #define INS_INTERNAL_AUTHENTICATE  0x88
 #define INS_GET_RESPONSE           0xC0
@@ -98,7 +99,7 @@
  */
 #define SW_BYTES_REMAINING(SW2)           0x61##SW2
 #define SW_COUNTER_PROVIDED_BY_X(X)       0x63C##X
-#define SW_WRONG_LENGTH	                  0x6700 
+#define SW_WRONG_LENGTH	                  0x6700
 #define SW_FUNCTIONS_IN_CLA_NOT_SUPPORTED 0x6800
 #define SW_LOGICAL_CHANNEL_NOT_SUPPORTED  0x6881
 #define SW_SECURE_MESSAGING_NOT_SUPPORTED 0x6882
@@ -108,7 +109,7 @@
 #define SW_DATA_INVALID	                  0x6984
 #define SW_CONDITIONS_NOT_SATISFIED	      0x6985
 #define SW_COMMAND_NOT_ALLOWED_AGAIN	  0x6986
-#define SW_WRONG_PARAMS                   0x6A00   
+#define SW_WRONG_PARAMS                   0x6A00
 #define SW_WRONG_DATA	                  0x6A80
 #define SW_FUNC_NOT_SUPPORTED             0x6A81
 #define SW_FILE_NOT_FOUND                 0x6A82

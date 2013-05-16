@@ -145,14 +145,27 @@ void main(void) {
 
           // Verify the certificate.
           if (!APDU_chained) {
-          public.vfyCert.offset = 0;
-            authentication_verifyCertificate(&caKey, public.vfyCert.cert);
+            public.vfyCert.offset = 0;
+            session.auth.certBody = authentication_verifyCertificate(&caKey, public.vfyCert.cert);
+            authentication_parseCertificate(session.auth.certBody);
           }
           APDU_ReturnSW(SW_NO_ERROR);
 
+        case INS_GET_CHALLENGE:
+          if (!CheckCase(1)) {
+            APDU_ReturnSW(SW_WRONG_LENGTH);
+          }
+
+          authentication_generateChallenge(&(session.auth.terminalKey), session.auth.challenge, public.apdu.data);
+          APDU_ReturnLa(SW_NO_ERROR, RSA_MOD_BYTES);
+
         case INS_EXTERNAL_AUTHENTICATE:
-          // Perform terminal authentication
-          break;
+          if (!CheckCase(3) && Lc != sizeof(Nonce)) {
+            APDU_ReturnSW(SW_WRONG_LENGTH);
+          }
+
+          authentication_authenticateTerminal(public.apdu.data, session.auth.challenge);
+          APDU_ReturnSW(SW_NO_ERROR);
 
         case INS_INTERNAL_AUTHENTICATE:
           // Perform card authentication & secure messaging setup

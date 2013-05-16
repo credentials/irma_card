@@ -20,7 +20,11 @@
 #ifndef __encoding_H
 #define __encoding_H
 
-#include "types.h"
+typedef struct {
+  unsigned int tag;
+  unsigned int length;
+  unsigned char *value;
+} TLV;
 
 /**
  * Encode the given number (of length bytes) into an ASN.1 DER object.
@@ -34,7 +38,7 @@
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-int asn1_encode_int(unsigned char *number, int length, unsigned char *buffer, int offset);
+int ASN1_encode_int(unsigned char *number, int length, unsigned char *buffer, int offset);
 
 /**
  * Encode the given sequence (of length bytes) into an ASN.1 DER object.
@@ -50,7 +54,11 @@ int asn1_encode_int(unsigned char *number, int length, unsigned char *buffer, in
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-int asn1_encode_seq(int length, int size, unsigned char *buffer, int offset);
+int ASN1_encode_seq(int length, int size, unsigned char *buffer, int offset);
+
+int ASN1_decode_tlv(TLV *tlv, const unsigned char *buffer, unsigned int *offset);
+
+int ASN1_decode_tag(unsigned int *tag, const unsigned char *buffer, unsigned int *offset);
 
 /**
  * Decode the length from a ASN.1 DER object.
@@ -66,6 +74,10 @@ int asn1_encode_seq(int length, int size, unsigned char *buffer, int offset);
  * @param offset in the buffer at which the length should be read
  * @return the length of the DER object in the buffer
  */
-int asn1_decode_length(const unsigned char *buffer, unsigned int *offset);
+int ASN1_decode_length(unsigned int *length, const unsigned char *buffer, unsigned int *offset);
+
+int ASN1_find_tlv(TLV *tlv, unsigned int tag, const unsigned char *buffer, unsigned int offset);
+
+#define ASN1_constructed_tlv(tlv) (((tlv)->tag & 0x2000) != 0)
 
 #endif // __encoding_H

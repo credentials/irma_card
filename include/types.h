@@ -20,6 +20,8 @@
 #ifndef __types_H
 #define __types_H
 
+#include "RSA.h"
+#include "authentication.h"
 #include "sizes.h"
 
 #ifndef NULL
@@ -187,6 +189,12 @@ typedef struct {
 } VerificationSession; // 444 + 2 = 446
 
 typedef struct {
+  ByteArray certBody;
+  RSA_public_key terminalKey;
+  Byte challenge[AUTH_CHALLENGE_BYTES];
+} TerminalAuthentication;
+
+typedef struct {
   CredentialFlags user;
   CredentialFlags issuer;
 } AdminFlags;
@@ -216,6 +224,7 @@ typedef union {
 typedef union {
   Byte base[1];
 
+  TerminalAuthentication auth;
   IssuanceSession issue;
   CLSignatureVerification vfySig;
   IssuanceProofSession vfyPrf;

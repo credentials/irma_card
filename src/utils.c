@@ -50,17 +50,17 @@ void ComputeHash(ValueArray list, int length, ByteArray result,
 
   // Store the values
   for (i = length - 1; i >= 0; i--) {
-    offset = asn1_encode_int(list[i].data, list[i].size, buffer, offset);
+    offset = ASN1_encode_int(list[i].data, list[i].size, buffer, offset);
   }
 
   // Store the number of values in the sequence
-  offset = asn1_encode_int((ByteArray) &length, 2, buffer, offset);
+  offset = ASN1_encode_int((ByteArray) &length, 2, buffer, offset);
 
   // Finalise the sequence
-  offset = asn1_encode_seq(size - offset, length, buffer, offset);
+  offset = ASN1_encode_seq(size - offset, length, buffer, offset);
 
   // Hash the data
-  debugValue("asn1rep", buffer + offset, size - offset);
+  debugValue("ASN1rep", buffer + offset, size - offset);
   SHA(SHA_256, result, size - offset, buffer + offset);
 }
 

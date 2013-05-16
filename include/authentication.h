@@ -22,6 +22,15 @@
 
 #include "RSA.h"
 
-void authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert);
+#define AUTH_CHALLENGE_BYTES 32
+
+unsigned char *authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert);
+
+void authentication_parseCertificate(unsigned char *cert);
+
+void authentication_generateChallenge(RSA_public_key *key, unsigned char *nonce, unsigned char *challenge);
+
+void authentication_authenticateTerminal(unsigned char *response, unsigned char *nonce);
+
 
 #endif // __authentication_H
