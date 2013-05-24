@@ -23,25 +23,27 @@
 #ifndef __issuance_H
 #define __issuance_H
 
+#include "types.h"
+
 /**
  * Construct a commitment (round 1)
  */
-void constructCommitment(void);
+void constructCommitment(Credential *credential, unsigned char *masterSecret);
 
 /**
  * Construct the signature (round 3, part 1)
  */
-void constructSignature(void);
+void constructSignature(Credential *credential);
 
 /**
  * (OPTIONAL) Verify the signature (round 3, part 2)
  */
-void verifySignature(void);
+void verifySignature(Credential *credential, unsigned char *masterSecret);
 
 /**
  * (OPTIONAL) Verify the proof (round 3, part 3)
  */
-void verifyProof(void);
+void verifyProof(Credential *credential);
 
 /**
  * Compute the response value vPrimeHat = vPrimeTilde + c*vPrime

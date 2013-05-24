@@ -69,29 +69,29 @@ int ASN1_encode_length(int length, unsigned char *buffer, int offset) {
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-int ASN1_encode_int(unsigned char *number, int length,
-                    unsigned char *buffer, int offset) {
+unsigned int ASN1_encode_int(unsigned int number_bytes, const unsigned char *number,
+                    unsigned char *buffer, unsigned int offset) {
   int skip = 0;
 
   // Determine the number of zero (0x00) bytes to skip
-  while(number[skip] == 0x00 && skip < length - 1) {
+  while(number[skip] == 0x00 && skip < number_bytes - 1) {
     skip++;
   }
 
   // Store the value
-  length -= skip;
-  offset -= length;
-  CopyBytes(length, buffer + offset, number + skip);
+  number_bytes -= skip;
+  offset -= number_bytes;
+  CopyBytes(number_bytes, buffer + offset, number + skip);
 
   // If needed, add a 0x00 byte for correct two-complements encoding
   if ((buffer[offset] & 0x80) != 0x00) {
     debugMessage("Correcting value for two-complements encoding");
     buffer[--offset] = 0x00;
-    length++;
+    number_bytes++;
   }
 
   // Store the length
-  offset = ASN1_encode_length(length, buffer, offset);
+  offset = ASN1_encode_length(number_bytes, buffer, offset);
 
   // Store the tag
   buffer[--offset] = 0x02; // ASN.1 INTEGER
@@ -114,7 +114,7 @@ int ASN1_encode_int(unsigned char *number, int length,
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-int ASN1_encode_seq(int length, int size, unsigned char *buffer, int offset) {
+unsigned int ASN1_encode_seq(unsigned int length, unsigned char *buffer, unsigned int offset) {
   // Store the length
   offset = ASN1_encode_length(length, buffer, offset);
 

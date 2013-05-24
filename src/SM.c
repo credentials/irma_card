@@ -22,14 +22,12 @@
 
 #include "SM.h"
 
-#include <DES.h>
-#include <multoscrypto.h>
-
 #include "APDU.h"
 #include "arithmetic.h"
 #include "debug.h"
-#include "externals.h"
+#include "DES.h"
 #include "memory.h"
+#include "sizes.h"
 
 /********************************************************************/
 /* Secure Messaging functions                                       */
@@ -38,7 +36,7 @@
 /**
  * Unwrap a command APDU from secure messaging
  */
-void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer) {
+void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc, unsigned char *iv, unsigned char *key_enc, unsigned char *key_mac) {
   unsigned char mac[SIZE_MAC];
   int i;
   unsigned int offset = 0;
@@ -46,7 +44,7 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer) {
   unsigned int do87Data_p = 0;
   unsigned int do87LenBytes = 0;
 
-  Increment(SIZE_SSC, ssc);
+  IncrementBytes(SIZE_SSC, ssc);
 
   if (apdu[offset] == 0x87) { // do87
     if (apdu[++offset] > 0x80) {
@@ -103,14 +101,14 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer) {
   i = SM_ISO7816_4_pad(buffer, i);
 
   // Verify the MAC
-  GenerateTripleDESCBCSignature(i, iv, key_mac, mac, buffer);
+  DES_CBCSign(i, iv, key_mac, mac, buffer);
   if (NotEqual(SIZE_MAC, mac, apdu + offset + 2)) {
     APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
   }
 
   // Decrypt data if available
   if (do87DataLen != 0) {
-    TripleDES2KeyCBCDecipherMessageNoPad(do87DataLen, buffer + do87Data_p, iv, key_enc, apdu);
+    DES_CBCDecipher(do87DataLen, buffer + do87Data_p, apdu, iv, SIZE_KEY, key_enc);
     i = SM_ISO7816_4_unpad(apdu, do87DataLen);
     if (i < 0) {
       APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
@@ -123,12 +121,12 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer) {
 /**
  * Wrap a response APDU for secure messaging
  */
-void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer) {
+void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc, unsigned char *iv, unsigned char *key_enc, unsigned char *key_mac) {
   unsigned int offset = 0, do87DataLen = __La + 1;
   unsigned char do87DataLenBytes = __La > 0xff ? 2 : 1;
   int i;
 
-  Increment(SIZE_SSC, ssc);
+  IncrementBytes(SIZE_SSC, ssc);
 
   if(__La > 0) {
     // Padding
@@ -147,7 +145,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer) {
     buffer[offset++] = 0x01;
 
     // Build the do87 data
-    TripleDES2KeyCBCEncipherMessageNoPad(__La, apdu, iv, key_enc, buffer + offset);
+    DES_CBCEncipher(__La, apdu, buffer + offset, iv, SIZE_KEY, key_enc);
     offset += __La;
   }
 
@@ -162,7 +160,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer) {
 
   // calculate and write mac
   Copy(SIZE_SSC, buffer - SIZE_SSC, ssc);
-  GenerateTripleDESCBCSignature(i + SIZE_SSC, iv, key_mac, apdu + offset + 2, buffer - SIZE_SSC);
+  DES_CBCSign(i + SIZE_SSC, iv, key_mac, apdu + offset + 2, buffer - SIZE_SSC);
 
   // write do8e
   buffer[offset++] = 0x8e;

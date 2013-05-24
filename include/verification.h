@@ -24,16 +24,17 @@
 #define __verification_H
 
 #include "MULTOS.h"
+#include "types.h"
 
 /**
  * Select the attributes to be disclosed.
  */
-void selectAttributes(int selection);
+void selectAttributes(Credential *credential, int selection);
 
 /**
  * Construct a proof.
  */
-void constructProof(void);
+void constructProof(Credential *credential, unsigned char *masterSecret);
 
 /**
  * Compute the value v' = v - e*r_A.

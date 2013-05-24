@@ -25,13 +25,15 @@
 #include "APDU.h"
 #include "arithmetic.h"
 #include "debug.h"
-#include "externals.h"
 #include "memory.h"
 #include "random.h"
 #include "sizes.h"
 #include "types.h"
 #include "types.debug.h"
 #include "utils.h"
+
+extern PublicData public;
+extern SessionData session;
 
 /********************************************************************/
 /* Issuing functions                                                */
@@ -54,14 +56,14 @@
  * @param buffer for hash of SIZE_BUFFER_C1
  * @param (buffer for SpecialModularExponentiation of SIZE_N)
  */
-void constructCommitment(void) {
+void constructCommitment(Credential *credential, unsigned char *masterSecret) {
 
   // Generate random vPrime
   RandomBits(session.issue.vPrime, LENGTH_VPRIME);
   debugValue("vPrime", session.issue.vPrime, SIZE_VPRIME);
 
   // Compute U = S^vPrime * R[0]^m[0] mod n
-  ModExpSpecial(SIZE_VPRIME, session.issue.vPrime, public.issue.U,
+  ModExpSpecial(credential, SIZE_VPRIME, session.issue.vPrime, public.issue.U,
     public.issue.buffer.number[0]);
   debugNumber("U = S^vPrime mod n", public.issue.U);
   ModExpSecure(SIZE_M, SIZE_N, masterSecret, credential->issuerKey.n,
@@ -79,7 +81,7 @@ void constructCommitment(void) {
   debugValue("sTilde", session.issue.sHat, SIZE_S_);
 
   // - Compute UTilde = S^vPrimeTilde * R[0]^sTilde mod n
-  ModExpSpecial(SIZE_VPRIME_, session.issue.vPrimeHat,
+  ModExpSpecial(credential, SIZE_VPRIME_, session.issue.vPrimeHat,
     public.issue.buffer.number[0], public.issue.buffer.number[1]);
   debugNumber("UTilde = S^vPrimeTilde mod n", public.issue.buffer.number[0]);
   ModExp(SIZE_S_, SIZE_N, session.issue.sHat, credential->issuerKey.n,
@@ -124,7 +126,8 @@ void constructCommitment(void) {
  * @param v'' in public.apdu.data of size SIZE_V
  * @param signature (A, e, v) in credential->signature
  */
-void constructSignature(void) {
+void constructSignature(Credential *credential) {
+  unsigned char flag;
 
   // Compute v = v' + v'' using add with carry
   debugValue("v'", session.issue.vPrime, SIZE_VPRIME);
@@ -163,14 +166,14 @@ void constructSignature(void) {
  * @param attributes (m[0]...m[l]) in credential->attribute
  * @param masterSecret
  */
-void verifySignature(void) {
+void verifySignature(Credential *credential, unsigned char *masterSecret) {
   Byte i;
 
   // Clear the memory before starting computations
   ClearBytes(sizeof(CLSignatureVerification), session.base);
 
   // Compute Z' = S^v mod n
-  ModExpSpecial(SIZE_V, credential->signature.v, session.vfySig.ZPrime, session.vfySig.buffer);
+  ModExpSpecial(credential, SIZE_V, credential->signature.v, session.vfySig.ZPrime, session.vfySig.buffer);
   debugNumber("Z' = S^v mod n", session.vfySig.buffer);
 
   // Compute Z' = S^v * A^e mod n
@@ -208,7 +211,7 @@ void verifySignature(void) {
  * @param issuerKey (n) in credential->issuerKey
  * @param proof (nonce, context, challenge, response) in credential->proof
  */
-void verifyProof(void) {
+void verifyProof(Credential *credential) {
 
   // Clear the memory before starting computations
   ClearBytes(sizeof(IssuanceProofVerification), public.base);

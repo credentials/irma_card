@@ -22,11 +22,10 @@
 
 #include "utils.h"
 
-#include "externals.h"
 #include "debug.h"
 #include "types.h"
 #include "SHA.h"
-#include "encoding.h"
+#include "ASN1.h"
 #include "memory.h"
 #include "arithmetic.h"
 
@@ -47,20 +46,20 @@
  * @param buffer which can be used for temporary storage
  * @param size of the buffer
  */
-void ComputeHash(ValueArray list, int length, ByteArray result,
-                         ByteArray buffer, int size) {
+void ComputeHash(ValueArray list, unsigned int length, ByteArray result,
+                         ByteArray buffer, unsigned int size) {
   int i, offset = size;
 
   // Store the values
   for (i = length - 1; i >= 0; i--) {
-    offset = ASN1_encode_int(list[i].data, list[i].size, buffer, offset);
+    offset = ASN1_encode_int(list[i].size, list[i].data, buffer, offset);
   }
 
   // Store the number of values in the sequence
-  offset = ASN1_encode_int((ByteArray) &length, 2, buffer, offset);
+  offset = ASN1_encode_int(2, (ByteArray) &length, buffer, offset);
 
   // Finalise the sequence
-  offset = ASN1_encode_seq(size - offset, length, buffer, offset);
+  offset = ASN1_encode_seq(size - offset, buffer, offset);
 
   // Hash the data
   debugValue("ASN1rep", buffer + offset, size - offset);
@@ -73,12 +72,12 @@ void ComputeHash(ValueArray list, int length, ByteArray result,
  * This value is required for exponentiations with base S and an
  * exponent which is larger than SIZE_N bytes.
  */
-void ComputeS_(void) {
+void ComputeS_(Credential *credential, unsigned char *buffer) {
   // Store the value l = SIZE_S_EXPONENT*8 in the buffer
-  Fill(SIZE_S_EXPONENT, public.issue.buffer.data, 0xFF);
+  Fill(SIZE_S_EXPONENT, buffer, 0xFF);
 
   // Compute S_ = S^(2_l)
-  ModExp(SIZE_S_EXPONENT, SIZE_N, public.issue.buffer.data,
+  ModExp(SIZE_S_EXPONENT, SIZE_N, buffer,
     credential->issuerKey.n, credential->issuerKey.S, credential->issuerKey.S_);
   ModMul(SIZE_N, credential->issuerKey.S_, credential->issuerKey.S,
     credential->issuerKey.n);
@@ -94,7 +93,7 @@ void ComputeS_(void) {
  * @param exponent the power to which the base S should be raised
  * @param result of the computation
  */
-void ModExpSpecial(int size, ByteArray exponent, ByteArray result, ByteArray buffer) {
+void ModExpSpecial(Credential *credential, int size, ByteArray exponent, ByteArray result, ByteArray buffer) {
   if (size > SIZE_N) {
     // Compute result = S^(exponent_bottom) * S_^(exponent_top)
     ModExp(SIZE_S_EXPONENT, SIZE_N, exponent + size - SIZE_S_EXPONENT,
@@ -132,7 +131,7 @@ void ClearBytes(int size, void *buffer) {
 /**
  * Clear the current credential.
  */
-void ClearCredential(void) {
+void ClearCredential(Credential *credential) {
   Byte i;
 
   // Put the address of the credential on the stack
@@ -165,11 +164,11 @@ void ClearCredential(void) {
 /**
  * Clear the current session.
  */
-void ClearSession(void) {
-  Clear(255, session.base);
-  Clear(sizeof(SessionData) % 255, session.base + 255);
-  Clear(255, public.base);
-  Clear(255, public.base + 255);
-  Clear(255, public.base + 255*2);
+/*#define ClearSession(session, public) \
+  Clear(255, session.base); \
+  Clear(sizeof(SessionData) % 255, session.base + 255); \
+  Clear(255, public.base); \
+  Clear(255, public.base + 255); \
+  Clear(255, public.base + 255*2); \
   Clear(sizeof(PublicData) % 255, public.base + 255*3);
-}
+*/

@@ -23,17 +23,15 @@
 #ifndef __SM_H
 #define __SM_H
 
-#include "externals.h"
-
 /**
  * Unwrap an incomming command APDU from secure messaging
  */
-void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer);
+void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc, unsigned char *iv, unsigned char *key_enc, unsigned char *key_mac);
 
 /**
  * Wrap an outgoing response APDU for secure messaging
  */
-void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer);
+void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc, unsigned char *iv, unsigned char *key_enc, unsigned char *key_mac);
 
 /**
  * Add padding to the input data according to ISO7816-4

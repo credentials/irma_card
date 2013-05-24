@@ -23,11 +23,11 @@
 #include "authentication.h"
 
 #include "APDU.h"
-#include "encoding.h"
-#include "externals.h"
+#include "ASN1.h"
 #include "debug.h"
 #include "memory.h"
 #include "random.h"
+#include "utils.h"
 #include "SHA.h"
 #include "RSA.h"
 
@@ -86,8 +86,7 @@ void authentication_authenticateTerminal(unsigned char *response, unsigned char 
  * @param key to be stored
  * @param mode for which a key needs to be derived
  */
-#define seed public.apdu.data
-void deriveSessionKey(ByteArray key, Byte mode) {
+void deriveSessionKey(unsigned char *seed, unsigned char *key, unsigned char mode) {
   int i, j, bits;
 
   // Derive the session key for mode
@@ -104,24 +103,21 @@ void deriveSessionKey(ByteArray key, Byte mode) {
     }
   }
 }
-#undef seed
 
 /**
  * Derive session keys from a given key seed
  */
-#define seed public.apdu.data
-void deriveSessionKeys(void) {
+void deriveSessionKeys(unsigned char *seed, unsigned char *ssc, unsigned char *key_enc, unsigned char *key_mac) {
   // Clear the seed suffix such that we can add a mode specific part
-  Clear(4, seed + SIZE_KEY_SEED);
+  ClearBytes(4, seed + SIZE_KEY_SEED);
 
   // Derive the session key for encryption
-  deriveSessionKey(seed + SIZE_KEY_SEED + 4, 0x01);
+  deriveSessionKey(seed, seed + SIZE_KEY_SEED + 4, 0x01);
   Copy(SIZE_KEY, key_enc, seed + SIZE_KEY_SEED + 4);
   Copy(4, ssc, seed + SIZE_KEY_SEED + 4 + SIZE_KEY);
 
   // Derive the session key for authentication
-  deriveSessionKey(seed + SIZE_KEY_SEED + 4, 0x02);
+  deriveSessionKey(seed, seed + SIZE_KEY_SEED + 4, 0x02);
   Copy(SIZE_KEY, key_mac, seed + SIZE_KEY_SEED + 4);
   Copy(4, ssc + 4, seed + SIZE_KEY_SEED + 4 + SIZE_KEY);
 }
-#undef seed

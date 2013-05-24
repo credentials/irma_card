@@ -37,6 +37,12 @@
 #define Increment(bytes, x) \
   __code(INCN, x, bytes)
 
+#define IncrementBytes(bytes, x) \
+  __push((void *)(x)); \
+  __push(BLOCKCAST(bytes)(x)); \
+  __code(INCN, bytes); \
+  __code(STOREI, bytes);
+
 #define ModMul(ModulusLength, LHS, RHS, Modulus) \
 do { \
   __push(__typechk(unsigned int, ModulusLength)); \

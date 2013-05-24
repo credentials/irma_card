@@ -34,8 +34,8 @@
  * @param buffer which can be used for temporary storage
  * @param size of the buffer
  */
-void ComputeHash(ValueArray list, int length, ByteArray result,
-                         ByteArray buffer, int size);
+void ComputeHash(ValueArray list, unsigned int length, ByteArray result,
+                         ByteArray buffer, unsigned int size);
 
 /**
  * Compute the helper value S' = S^(2_l) where l = SIZE_S_EXPONENT*8
@@ -43,7 +43,7 @@ void ComputeHash(ValueArray list, int length, ByteArray result,
  * This value is required for exponentiations with base S and an 
  * exponent which is larger than SIZE_N bytes.
  */
-void ComputeS_(void);
+void ComputeS_(Credential *credential, unsigned char *buffer);
 
 /**
  * Compute the modular exponentiation: result = S^exponent mod n
@@ -55,7 +55,7 @@ void ComputeS_(void);
  * @param exponent the power to which the base S should be raised
  * @param result of the computation
  */
-void ModExpSpecial(int size, ByteArray exponent, ByteArray result, ByteArray buffer);
+void ModExpSpecial(Credential *credential, int size, ByteArray exponent, ByteArray result, ByteArray buffer);
 
 /**
  * Clear size bytes from a bytearray
@@ -68,11 +68,11 @@ void ClearBytes(int size, void *buffer);
 /**
  * Clear the current credential.
  */
-void ClearCredential(void);
+void ClearCredential(Credential *credential);
 
 /**
  * Clear the current session.
  */
-void ClearSession(void);
+//void ClearSession(void);
 
 #endif // __utils_H

@@ -113,7 +113,7 @@ void main(void) {
     if (!CheckCase(4)) {
       APDU_ReturnSW(SW_WRONG_LENGTH);
     }
-    SM_APDU_unwrap(public.apdu.data, public.apdu.session);
+    SM_APDU_unwrap(public.apdu.data, public.apdu.session, &ssc[0], &iv[0], &key_enc[0], &key_mac[0]);
     debugValue("Unwrapped APDU", public.apdu.data, Lc);
   }
 
@@ -404,7 +404,7 @@ void main(void) {
               debugMessage("P1_PUBLIC_KEY_S");
               Copy(SIZE_N, credential->issuerKey.S, public.apdu.data);
               debugNumber("Initialised isserKey.S", credential->issuerKey.S);
-              ComputeS_();
+              ComputeS_(credential, public.issue.buffer.data);
               debugNumber("Initialised isserKey.S_", credential->issuerKey.S_);
               break;
 
@@ -461,7 +461,7 @@ void main(void) {
 
           Copy(SIZE_STATZK, public.issue.nonce, public.apdu.data);
           debugNonce("Initialised nonce", public.issue.nonce);
-          constructCommitment();
+          constructCommitment(credential, &masterSecret[0]);
           debugNumber("Returned U", public.apdu.data);
           APDU_ReturnLa(SW_NO_ERROR, SIZE_N);
 
@@ -553,7 +553,7 @@ void main(void) {
                 APDU_ReturnSW(SW_WRONG_LENGTH);
               }
 
-              constructSignature();
+              constructSignature(credential);
               debugValue("Initialised signature.v", credential->signature.v, SIZE_V);
               break;
 
@@ -563,7 +563,7 @@ void main(void) {
                 APDU_ReturnSW(SW_WRONG_LENGTH);
               }
 
-              verifySignature();
+              verifySignature(credential, &masterSecret[0]);
               debugMessage("Verified signature");
               break;
 
@@ -609,7 +609,7 @@ void main(void) {
                 APDU_ReturnSW(SW_WRONG_LENGTH);
               }
 
-              verifyProof();
+              verifyProof(credential);
               debugMessage("Verified proof");
               break;
 
@@ -644,7 +644,7 @@ void main(void) {
             if (credentials[i].id == public.verificationSetup.id) {
               credential = &credentials[i];
 
-              selectAttributes(public.verificationSetup.selection);
+              selectAttributes(credential, public.verificationSetup.selection);
 
               if (CHV_required && !CHV_verified(credPIN)) {
                 credential = NULL;
@@ -679,7 +679,7 @@ void main(void) {
             APDU_ReturnSW(SW_WRONG_LENGTH);
           }
 
-          constructProof();
+          constructProof(credential, &masterSecret[0]);
           debugHash("Returned c", public.apdu.data);
           APDU_ReturnLa(SW_NO_ERROR, SIZE_H);
 
@@ -834,7 +834,7 @@ void main(void) {
 
           // Verify the given credential ID and remove it if it matches
           if (credential->id == P1P2) {
-            ClearCredential();
+            ClearCredential(credential);
             debugInteger("Removed credential", P1P2);
 
             // Create new log entry

@@ -25,12 +25,14 @@
 #include "APDU.h"
 #include "arithmetic.h"
 #include "debug.h"
-#include "externals.h"
 #include "memory.h"
 #include "random.h"
 #include "sizes.h"
 #include "types.h"
 #include "utils.h"
+
+extern PublicData public;
+extern SessionData session;
 
 /********************************************************************/
 /* Proving functions                                                */
@@ -41,7 +43,7 @@
  *
  * @param selection bitmask of attributes to be disclosed.
  */
-void selectAttributes(int selection) {
+void selectAttributes(Credential *credential, int selection) {
 
   // Never disclose the master secret.
   if ((selection & 0x0001) != 0) {
@@ -72,7 +74,7 @@ void selectAttributes(int selection) {
 /**
  * Construct a proof.
  */
-void constructProof(void) {
+void constructProof(Credential *credential, unsigned char *masterSecret) {
   unsigned char i;
 
   // Generate random values for m~[i], e~, v~ and rA
@@ -96,13 +98,13 @@ void constructProof(void) {
 
   // Compute A' = A * S^r_A
   // IMPORTANT: Correction to the size of rA to skip initial zero bytes
-  ModExpSpecial(SIZE_R_A - 1, public.prove.rA + 1, public.prove.APrime, public.prove.buffer.number[0]);
+  ModExpSpecial(credential, SIZE_R_A - 1, public.prove.rA + 1, public.prove.APrime, public.prove.buffer.number[0]);
   debugValue("A' = S^r_A mod n", public.prove.APrime, SIZE_N);
   ModMul(SIZE_N, public.prove.APrime, credential->signature.A, credential->issuerKey.n);
   debugValue("A' = A' * A mod n", public.prove.APrime, SIZE_N);
 
   // Compute ZTilde = A'^eTilde * S^vTilde * (R[i]^mTilde[i] foreach i not in D)
-  ModExpSpecial(SIZE_V_, public.prove.vHat, public.prove.buffer.number[0], public.prove.buffer.number[1]);
+  ModExpSpecial(credential, SIZE_V_, public.prove.vHat, public.prove.buffer.number[0], public.prove.buffer.number[1]);
   debugValue("ZTilde = S^vTilde", public.prove.buffer.number[0], SIZE_N);
   ModExp(SIZE_E_, SIZE_N, public.prove.eHat, credential->issuerKey.n, public.prove.APrime, public.prove.buffer.number[1]);
   debugValue("buffer = A'^eTilde", public.prove.buffer.number[1], SIZE_N);

@@ -63,7 +63,7 @@ unsigned int ASN1_encode_int(unsigned int number_bytes, const unsigned char *num
  * @param offset in front of which the object should be stored
  * @return the offset of the encoded object in the buffer
  */
-unsigned int ASN1_encode_seq(unsigned int length, int size, unsigned char *buffer, int offset);
+unsigned int ASN1_encode_seq(unsigned int length, unsigned char *buffer, unsigned int offset);
 
 int ASN1_decode_tlv(TLV *tlv, const unsigned char *buffer, unsigned int *offset);
 
