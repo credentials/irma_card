@@ -25,13 +25,17 @@
 
 #include "MULTOS.h"
 
-#define BLOCK_MODE_ECB 0x01
-#define BLOCK_MODE_CBC 0x02
+#define DES_2KEY_BITS 128
+#define DES_3KEY_BITS 192
+#define DES_IV_BITS 64
 
-#define ALGORITHM_DES   0x03
-#define ALGORITHM_3DES  0x04
+#define DES_BITS_TO_BYTES(bits) ((bits + 7) /8)
 
-#define DES_CBCSign(message_bytes, iv, key, signature, message) \
+#define DES_2KEY_BYTES DES_BITS_TO_BYTES(DES_2KEY_BITS)
+#define DES_3KEY_BYTES DES_BITS_TO_BYTES(DES_3KEY_BITS)
+#define DES_IV_BYTES DES_BITS_TO_BYTES(DES_IV_BITS)
+
+#define DES_CBC_sign(message_bytes, iv, key, signature, message) \
 do { \
   __push((unsigned int)(message_bytes)); \
   __push((void *)(iv)); \
@@ -41,29 +45,44 @@ do { \
   __code(PRIM, PRIM_GENERATE_TRIPLE_DES_CBC_SIGNATURE); \
 } while (0)
 
-#define DES_CBCDecipher(cipher_bytes, cipher, plain, iv, key_bytes, key) \
+#define DES_CBC_decrypt(cipher_bytes, cipher, plain, iv, key_bytes, key) \
 do { \
-  __push(0x08); /* iv_bytes = 8 */\
+  __push(DES_IV_BYTES); \
   __push((void *)(iv)); \
+  DES_decrypt(cipher_bytes, cipher, plain, key_bytes, key, BLOCK_CIPHER_MODE_CBC); \
+} while (0)
+
+#define DES_ECB_decrypt(cipher_bytes, cipher, plain, key_bytes, key) \
+do { \
+  DES_decrypt(cipher_bytes, cipher, plain, key_bytes, key, BLOCK_CIPHER_MODE_ECB); \
+} while (0)
+
+#define DES_decrypt(cipher_bytes, cipher, plain, key_bytes, key, mode) \
   __push((unsigned int)(cipher_bytes)); \
   __push((void *)(key)); \
-  __push((unsigned char)(key_bytes)); \
+  __push((unsigned int)(key_bytes)); \
   __push((void *)(plain)); \
   __push((void *)(cipher)); \
-  __code(PRIM, PRIM_BLOCK_DECIPHER, ALGORITHM_3DES, BLOCK_MODE_CBC); \
+  __code(PRIM, PRIM_BLOCK_DECIPHER, BLOCK_CIPHER_ALGORITHM_DES, mode);
+
+#define DES_CBC_encrypt(plain_bytes, plain, cipher, iv, key_bytes, key) \
+do { \
+  __push(DES_IV_BYTES); \
+  __push((void *)(iv)); \
+  DES_decrypt(plain_bytes, plain, cipher, key_bytes, key, BLOCK_CIPHER_MODE_CBC); \
 } while (0)
 
-
-#define DES_CBCEncipher(plain_bytes, plain, cipher, iv, key_bytes, key) \
+#define DES_ECB_encrypt(plain_bytes, plain, cipher, key_bytes, key) \
 do { \
-  __push(0x08); /* iv_bytes = 8 */\
-  __push((void *)(iv)); \
+  DES_decrypt(cipher_bytes, cipher, plain, key_bytes, key, BLOCK_CIPHER_MODE_ECB); \
+} while (0)
+
+#define DES_encrypt(plain_bytes, plain, cipher, key_bytes, key, mode) \
   __push((unsigned int)(plain_bytes)); \
   __push((void *)(key)); \
-  __push((unsigned char)(key_bytes)); \
-  __push((void *)(cipher)); \
+  __push((unsigned int)(key_bytes)); \
   __push((void *)(plain)); \
-  __code(PRIM, PRIM_BLOCK_ENCIPHER, ALGORITHM_3DES, BLOCK_MODE_CBC); \
-} while (0)
+  __push((void *)(cipher)); \
+  __code(PRIM, PRIM_BLOCK_ENCIPHER, BLOCK_CIPHER_ALGORITHM_3DES, mode);
 
 #endif // __DES_H

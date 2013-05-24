@@ -101,14 +101,14 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, unsigned char *s
   i = SM_ISO7816_4_pad(buffer, i);
 
   // Verify the MAC
-  DES_CBCSign(i, iv, key_mac, mac, buffer);
+  DES_CBC_sign(i, iv, key_mac, mac, buffer);
   if (NotEqual(SIZE_MAC, mac, apdu + offset + 2)) {
     APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
   }
 
   // Decrypt data if available
   if (do87DataLen != 0) {
-    DES_CBCDecipher(do87DataLen, buffer + do87Data_p, apdu, iv, SIZE_KEY, key_enc);
+    DES_CBC_decrypt(do87DataLen, buffer + do87Data_p, apdu, iv, DES_2KEY_BYTES, key_enc);
     i = SM_ISO7816_4_unpad(apdu, do87DataLen);
     if (i < 0) {
       APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
@@ -145,7 +145,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc
     buffer[offset++] = 0x01;
 
     // Build the do87 data
-    DES_CBCEncipher(__La, apdu, buffer + offset, iv, SIZE_KEY, key_enc);
+    DES_CBC_encrypt(__La, apdu, buffer + offset, iv, DES_2KEY_BYTES, key_enc);
     offset += __La;
   }
 
@@ -160,7 +160,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc
 
   // calculate and write mac
   Copy(SIZE_SSC, buffer - SIZE_SSC, ssc);
-  DES_CBCSign(i + SIZE_SSC, iv, key_mac, apdu + offset + 2, buffer - SIZE_SSC);
+  DES_CBC_sign(i + SIZE_SSC, iv, key_mac, apdu + offset + 2, buffer - SIZE_SSC);
 
   // write do8e
   buffer[offset++] = 0x8e;
