@@ -1,34 +1,33 @@
 /**
  * memory.h
  *
- * This program is free software: you can redistribute it and/or modify
+ * This file is part of IRMAcard.
+ *
+ * IRMAcard is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
+ * IRMAcard is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with IRMAcard. If not, see <http://www.gnu.org/licenses/>.
  *
- * Copyright (C) Pim Vullers, Radboud University Nijmegen, April 2013.
+ * Copyright (C) April 2013 - 2013.
+ *   Pim Vullers <pim@cs.ru.nl>, Radboud University Nijmegen.
  */
 
 #ifndef __MEMORY_H
 #define __MEMORY_H
 
 #include "MULTOS.h"
-
 #include <string.h> // for memcmp, memset
 
-#define CopyFlex CopyNonAtomic
-#define CopyFixed CopyFixedNonAtomic
-
-#define Copy CopyFixed
-#define CopyBytes CopyFlex
+#define Copy CopyFixedNonAtomic
+#define CopyBytes CopyNonAtomic
 
 #define CopyAtomic(bytes, dest, src) \
 do { \
