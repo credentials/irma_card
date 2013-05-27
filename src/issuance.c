@@ -22,7 +22,6 @@
 
 #include "issuance.h"
 
-#include "APDU.h"
 #include "debug.h"
 #include "math.h"
 #include "memory.h"
@@ -166,39 +165,41 @@ void constructSignature(Credential *credential) {
  * @param attributes (m[0]...m[l]) in credential->attribute
  * @param masterSecret
  */
-void verifySignature(Credential *credential, unsigned char *masterSecret) {
+int verifySignature(Credential *credential, unsigned char *masterSecret, CLSignatureVerification *session) {
   Byte i;
 
   // Clear the memory before starting computations
-  ClearBytes(sizeof(CLSignatureVerification), session.base);
+  ClearBytes(sizeof(CLSignatureVerification), session);
 
   // Compute Z' = S^v mod n
-  ModExpSpecial(credential, SIZE_V, credential->signature.v, session.vfySig.ZPrime, session.vfySig.buffer);
-  debugNumber("Z' = S^v mod n", session.vfySig.buffer);
+  ModExpSpecial(credential, SIZE_V, credential->signature.v, session->ZPrime, session->buffer);
+  debugNumber("Z' = S^v mod n", session->buffer);
 
   // Compute Z' = S^v * A^e mod n
-  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, session.vfySig.buffer);
-  debugNumber("buffer = A^e mod n", session.vfySig.buffer);
-  ModMul(SIZE_N, session.vfySig.ZPrime, session.vfySig.buffer, credential->issuerKey.n);
-  debugNumber("Z' = Z' * buffer mod n", session.vfySig.ZPrime);
+  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, session->buffer);
+  debugNumber("buffer = A^e mod n", session->buffer);
+  ModMul(SIZE_N, session->ZPrime, session->buffer, credential->issuerKey.n);
+  debugNumber("Z' = Z' * buffer mod n", session->ZPrime);
 
   // Compute Z' = S^v * A^e * R[i]^m[i] mod n forall i
-  ModExpSecure(SIZE_M, SIZE_N, masterSecret, credential->issuerKey.n, credential->issuerKey.R[0], session.vfySig.buffer);
-  debugNumber("buffer = R[0]^ms mod n", session.vfySig.buffer);
-  ModMul(SIZE_N, session.vfySig.ZPrime, session.vfySig.buffer, credential->issuerKey.n);
-  debugNumber("Z' = Z' * buffer mod n", session.vfySig.ZPrime);
+  ModExpSecure(SIZE_M, SIZE_N, masterSecret, credential->issuerKey.n, credential->issuerKey.R[0], session->buffer);
+  debugNumber("buffer = R[0]^ms mod n", session->buffer);
+  ModMul(SIZE_N, session->ZPrime, session->buffer, credential->issuerKey.n);
+  debugNumber("Z' = Z' * buffer mod n", session->ZPrime);
   for (i = 0; i < credential->size; i++) {
-    ModExp(SIZE_M, SIZE_N, credential->attribute[i], credential->issuerKey.n, credential->issuerKey.R[i + 1], session.vfySig.buffer);
-    debugNumber("buffer = R[i]^m[i] mod n", session.vfySig.buffer);
-    ModMul(SIZE_N, session.vfySig.ZPrime, session.vfySig.buffer, credential->issuerKey.n);
-    debugNumber("Z' = Z' * buffer mod n", session.vfySig.ZPrime);
+    ModExp(SIZE_M, SIZE_N, credential->attribute[i], credential->issuerKey.n, credential->issuerKey.R[i + 1], session->buffer);
+    debugNumber("buffer = R[i]^m[i] mod n", session->buffer);
+    ModMul(SIZE_N, session->ZPrime, session->buffer, credential->issuerKey.n);
+    debugNumber("Z' = Z' * buffer mod n", session->ZPrime);
   }
 
   // Verify Z =?= Z'
-  if (NotEqual(SIZE_N, credential->issuerKey.Z, session.vfySig.ZPrime)) {
+  if (NotEqual(SIZE_N, credential->issuerKey.Z, session->ZPrime)) {
     // TODO: clear already stored things?
     debugError("verifySignature(): verification of signature failed");
-    APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+    return ISSUANCE_ERROR_SIGNATURE_INVALID;
+  } else {
+    return ISSUANCE_SIGNATURE_VALID;
   }
 }
 
@@ -211,42 +212,44 @@ void verifySignature(Credential *credential, unsigned char *masterSecret) {
  * @param issuerKey (n) in credential->issuerKey
  * @param proof (nonce, context, challenge, response) in credential->proof
  */
-void verifyProof(Credential *credential) {
+int verifyProof(Credential *credential, IssuanceProofSession *session, IssuanceProofVerification *public) {
 
   // Clear the memory before starting computations
-  ClearBytes(sizeof(IssuanceProofVerification), public.base);
-  ClearBytes(sizeof(IssuanceProofSession), session.base);
+  ClearBytes(sizeof(IssuanceProofVerification), public);
+  ClearBytes(sizeof(IssuanceProofSession), session);
 
   // Compute Q = A^e mod n
-  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, session.vfyPrf.Q);
-  debugNumber("Q = A^e mod n", session.vfyPrf.Q);
+  ModExp(SIZE_E, SIZE_N, credential->signature.e, credential->issuerKey.n, credential->signature.A, session->Q);
+  debugNumber("Q = A^e mod n", session->Q);
 
   // Compute AHat = A^(c + s_e * e) = Q^s_e * A^c mod n
-  ModExp(SIZE_N, SIZE_N, credential->proof.response, credential->issuerKey.n, session.vfyPrf.Q, public.vfyPrf.buffer);
-  debugNumber("buffer = Q^s_e mod n", public.vfyPrf.buffer);
-  ModExp(SIZE_H, SIZE_N, credential->proof.challenge, credential->issuerKey.n, credential->signature.A, session.vfyPrf.AHat);
-  debugNumber("AHat = A^c mod n", session.vfyPrf.AHat);
-  ModMul(SIZE_N, session.vfyPrf.AHat, public.vfyPrf.buffer, credential->issuerKey.n);
-  debugNumber("AHat = AHat * buffer", session.vfyPrf.AHat);
+  ModExp(SIZE_N, SIZE_N, credential->proof.response, credential->issuerKey.n, session->Q, public->buffer);
+  debugNumber("buffer = Q^s_e mod n", public->buffer);
+  ModExp(SIZE_H, SIZE_N, credential->proof.challenge, credential->issuerKey.n, credential->signature.A, session->AHat);
+  debugNumber("AHat = A^c mod n", session->AHat);
+  ModMul(SIZE_N, session->AHat, public->buffer, credential->issuerKey.n);
+  debugNumber("AHat = AHat * buffer", session->AHat);
 
   // Compute challenge c' = H(context | Q | A | nonce | AHat)
-  session.vfyPrf.list[0].data = credential->proof.context;
-  session.vfyPrf.list[0].size = SIZE_H;
-  session.vfyPrf.list[1].data = session.vfyPrf.Q;
-  session.vfyPrf.list[1].size = SIZE_N;
-  session.vfyPrf.list[2].data = credential->signature.A;
-  session.vfyPrf.list[2].size = SIZE_N;
-  session.vfyPrf.list[3].data = credential->proof.nonce;
-  session.vfyPrf.list[3].size = SIZE_STATZK;
-  session.vfyPrf.list[4].data = session.vfyPrf.AHat;
-  session.vfyPrf.list[4].size = SIZE_N;
-  ComputeHash(session.vfyPrf.list, 5, session.vfyPrf.challenge, public.vfyPrf.buffer, SIZE_BUFFER_C2);
-  debugHash("c'", session.vfyPrf.challenge);
+  session->list[0].data = credential->proof.context;
+  session->list[0].size = SIZE_H;
+  session->list[1].data = session->Q;
+  session->list[1].size = SIZE_N;
+  session->list[2].data = credential->signature.A;
+  session->list[2].size = SIZE_N;
+  session->list[3].data = credential->proof.nonce;
+  session->list[3].size = SIZE_STATZK;
+  session->list[4].data = session->AHat;
+  session->list[4].size = SIZE_N;
+  ComputeHash(session->list, 5, session->challenge, public->buffer, SIZE_BUFFER_C2);
+  debugHash("c'", session->challenge);
 
   // Verify c =?= c'
-  if (NotEqual(SIZE_H, credential->proof.challenge, session.vfyPrf.challenge)) {
+  if (NotEqual(SIZE_H, credential->proof.challenge, session->challenge)) {
     // TODO: clear already stored things?
     debugError("verifyProof(): verification of P2 failed");
-    APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+    return ISSUANCE_ERROR_PROOF_INVALID;
+  } else {
+    return ISSUANCE_PROOF_VALID;
   }
 }

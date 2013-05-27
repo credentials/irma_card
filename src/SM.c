@@ -23,11 +23,10 @@
 #include "SM.h"
 
 #include "APDU.h"
-#include "debug.h"
 #include "math.h"
 #include "memory.h"
 
-// Secure messaging: initialisation vector
+// Secure messaging: Initialisation Vector
 unsigned char SM_IV[SM_IV_BYTES];
 
 /********************************************************************/
@@ -37,45 +36,49 @@ unsigned char SM_IV[SM_IV_BYTES];
 /**
  * Unwrap a command APDU from secure messaging
  */
-void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params) {
+int SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params) {
   unsigned char mac[SM_MAC_BYTES];
   int i;
   unsigned int offset = 0;
-  unsigned int do87DataLen = 0;
-  unsigned int do87Data_p = 0;
-  unsigned int do87LenBytes = 0;
+  unsigned int do87DataBytes = 0;
+  unsigned int do87Data = 0;
 
   IncrementBytes(SM_SSC_BYTES, params->ssc);
 
   if (apdu[offset] == 0x87) { // do87
     if (apdu[++offset] > 0x80) {
-      do87LenBytes = apdu[offset++] & 0x7f;
+      do87Data = apdu[offset++] & 0x7f;
     } else {
-      do87LenBytes = 1;
+      do87Data = 1;
     }
 
-    for (i = 0; i < do87LenBytes; i++) {
-      do87DataLen += apdu[offset + i] << (do87LenBytes - 1 - i) * 8;
+    for (i = 0; i < do87Data; i++) {
+      do87DataBytes += apdu[offset + i] << (do87Data - 1 - i) * 8;
     }
-    offset += do87LenBytes;
+    offset += do87Data;
 
-    if (apdu[offset++] != 0x01) APDU_ReturnSW(SW_WRONG_DATA);
-    do87DataLen--; // compensate for 0x01 marker
+    if (apdu[offset++] != 0x01) {
+      return SM_ERROR_WRONG_DATA;
+    }
+    do87DataBytes--; // compensate for 0x01 marker
 
     // store pointer to data and defer decrypt to after mac check (do8e)
-    do87Data_p = offset;
-    offset += do87DataLen;
+    do87Data = offset;
+    offset += do87DataBytes;
   }
 
   if (apdu[offset] == 0x97) { // do97
-    if (apdu[++offset] != 0x01) APDU_ReturnSW(SW_WRONG_DATA);
+    if (apdu[++offset] != 0x01) {
+      return SM_ERROR_WRONG_DATA;
+    }
     Le = apdu[++offset];
     offset++;
   }
 
   // do8e
-  if (apdu[offset] != 0x8e) APDU_ReturnSW(SW_WRONG_DATA);
-  if (apdu[offset + 1] != 8) APDU_ReturnSW(SW_DATA_INVALID);
+  if (apdu[offset] != 0x8e || apdu[offset + 1] != 8) {
+    return SM_ERROR_WRONG_DATA;
+  }
 
   // verify mac
   i = 0;
@@ -95,7 +98,7 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *p
 
   // Cryptogram (do87 and do97)
   CopyBytes(offset, buffer + i, apdu);
-  do87Data_p += i;
+  do87Data += i;
   i += offset;
 
   // Padding
@@ -104,18 +107,18 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *p
   // Verify the MAC
   SM_CBC_sign(i, SM_IV, params->key_mac, mac, buffer);
   if (NotEqual(SM_MAC_BYTES, mac, apdu + offset + 2)) {
-    APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+    return SM_ERROR_MAC_INVALID;
   }
 
   // Decrypt data if available
-  if (do87DataLen != 0) {
-    SM_CBC_decrypt(do87DataLen, buffer + do87Data_p, apdu, SM_IV, SM_KEY_BYTES, params->key_enc);
-    i = SM_ISO7816_4_unpad(apdu, do87DataLen);
-    if (i < 0) {
-      APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
-	} else {
-      Lc = i;
-	}
+  if (do87DataBytes != 0) {
+    SM_CBC_decrypt(do87DataBytes, buffer + do87Data, apdu, SM_IV, SM_KEY_BYTES, params->key_enc);
+    Lc = do87DataBytes;
+    if (SM_ISO7816_4_unpad(apdu, &Lc) < 0) {
+      return SM_ERROR_PADDING_INVALID;
+    } else {
+      return Lc;
+    }
   }
 }
 
@@ -123,8 +126,7 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *p
  * Wrap a response APDU for secure messaging
  */
 void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params) {
-  unsigned int offset = 0, do87DataLen = __La + 1;
-  unsigned char do87DataLenBytes = __La > 0xff ? 2 : 1;
+  unsigned int offset = 0;
   int i;
 
   IncrementBytes(SM_SSC_BYTES, params->ssc);
@@ -135,12 +137,12 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *par
 
     // Build do87 header
     buffer[offset++] = 0x87;
-    if(do87DataLen < 0x0080) {
-      buffer[offset++] = do87DataLen;
+    if(__La + 1 < 0x0080) {
+      buffer[offset++] = __La + 1;
     } else {
-      buffer[offset++] = 0x0080 + do87DataLenBytes;
-      for(i = do87DataLenBytes - 1; i >= 0; i--) {
-        buffer[offset++] = do87DataLen >> (i * 8);
+      buffer[offset++] = 0x0080 + (__La > 0xff ? 2 : 1);
+      for(i = (__La > 0xff ? 1 : 0); i >= 0; i--) {
+        buffer[offset++] = (__La + 1) >> (i * 8);
       }
     }
     buffer[offset++] = 0x01;
@@ -194,13 +196,14 @@ unsigned int SM_ISO7816_4_pad(unsigned char *data, unsigned int length) {
  * @param length of the data including padding
  * @return the new size of the data excluding padding
  */
-int SM_ISO7816_4_unpad(unsigned char *data, unsigned int length) {
-  while (length > 0 && data[--length] == 0x00);
-  if (data[length] != 0x80) {
-    debugError("SM_unpad: Invalid padding");
-    return SM_ERROR_ISO7816_4_PADDING_INVALID;
+int SM_ISO7816_4_unpad(unsigned char *data, unsigned int *length) {
+  while (*length > 0 && data[--(*length)] == 0x00);
+
+  if (data[*length] != 0x80) {
+    return SM_ISO7816_4_ERROR_PADDING_INVALID;
+  } else {
+    return *length;
   }
-  return length;
 }
 
 /**

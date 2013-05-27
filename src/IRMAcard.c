@@ -103,13 +103,22 @@ void main(void) {
   unsigned char flag;
   int i;
 
-  // Check whether the APDU has been APDU_wrapped for secure messaging
+  // Check whether the APDU has been wrapped for secure messaging
   if (APDU_wrapped) {
     if (!CheckCase(4)) {
-      APDU_ReturnSW(SW_WRONG_LENGTH);
+      SM_ReturnSW(SW_WRONG_LENGTH);
     }
-    SM_APDU_unwrap(public.apdu.data, public.apdu.session, &tunnel);
-    debugValue("Unwrapped APDU", public.apdu.data, Lc);
+
+    i = SM_APDU_unwrap(public.apdu.data, public.apdu.session, &tunnel);
+    switch (i) {
+      case SM_ERROR_WRONG_DATA:
+        SM_ReturnSW(SW_DATA_INVALID);
+      case SM_ERROR_MAC_INVALID:
+      case SM_ERROR_PADDING_INVALID:
+        SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+      default:
+        debugValue("Unwrapped APDU", public.apdu.data, Lc);
+    }
   }
 
   switch (CLA & (0xFF ^ (CLA_SECURE_MESSAGING | CLA_COMMAND_CHAINING))) {
@@ -144,7 +153,9 @@ void main(void) {
           // Verify the certificate.
           if (!APDU_chained) {
             public.vfyCert.offset = 0;
-            session.auth.certBody = authentication_verifyCertificate(&caKey, public.vfyCert.cert);
+            if (authentication_verifyCertificate(&caKey, public.vfyCert.cert, session.auth.certBody) < 0) {
+              APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            }
             authentication_parseCertificate(session.auth.certBody);
           }
           APDU_ReturnSW(SW_NO_ERROR);
@@ -326,22 +337,22 @@ void main(void) {
         case INS_ISSUE_CREDENTIAL:
           debugMessage("INS_ISSUE_CREDENTIAL");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (!((APDU_wrapped || CheckCase(3)) &&
               (Lc == sizeof(CredentialIdentifier) + sizeof(Hash) + sizeof(Size) + sizeof(CredentialFlags)
               || Lc == sizeof(CredentialIdentifier) + sizeof(Hash) + sizeof(Size) + sizeof(CredentialFlags) + SIZE_TIMESTAMP))) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
           if (P1P2 != 0) {
-            APDU_ReturnSW(SW_WRONG_P1P2);
+            SM_ReturnSW(SW_WRONG_P1P2);
           }
 
           // Prevent reissuance of a credential
           for (i = 0; i < MAX_CRED; i++) {
             if (credentials[i].id == public.issuanceSetup.id) {
               debugWarning("Credential already exists");
-              APDU_ReturnSW(SW_COMMAND_NOT_ALLOWED_AGAIN);
+              SM_ReturnSW(SW_COMMAND_NOT_ALLOWED_AGAIN);
             }
           }
 
@@ -362,24 +373,24 @@ void main(void) {
               logEntry->action = ACTION_ISSUE;
               logEntry->credential = credential->id;
 
-              APDU_ReturnSW(SW_NO_ERROR);
+              SM_ReturnSW(SW_NO_ERROR);
             }
           }
 
           // Out of space (all credential slots are occupied)
           debugWarning("Cannot issue another credential");
-          APDU_ReturnSW(SW_COMMAND_NOT_ALLOWED);
+          SM_ReturnSW(SW_COMMAND_NOT_ALLOWED);
 
         case INS_ISSUE_PUBLIC_KEY:
           debugMessage("INS_ISSUE_PUBLIC_KEY");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
           if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_N)) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
 
           switch (P1) {
@@ -406,7 +417,7 @@ void main(void) {
             case P1_PUBLIC_KEY_R:
               debugMessage("P1_PUBLIC_KEY_R");
               if (P2 > MAX_ATTR) {
-                APDU_ReturnSW(SW_WRONG_P1P2);
+                SM_ReturnSW(SW_WRONG_P1P2);
               }
               Copy(SIZE_N, credential->issuerKey.R[P2], public.apdu.data);
               debugIndexedNumber("Initialised isserKey.R", credential->issuerKey.R, P2);
@@ -414,62 +425,62 @@ void main(void) {
 
             default:
               debugWarning("Unknown parameter");
-              APDU_ReturnSW(SW_WRONG_P1P2);
+              SM_ReturnSW(SW_WRONG_P1P2);
           }
-          APDU_ReturnSW(SW_NO_ERROR);
+          SM_ReturnSW(SW_NO_ERROR);
 
         case INS_ISSUE_ATTRIBUTES:
           debugMessage("INS_ISSUE_ATTRIBUTES");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
           if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_M)) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
           if (P1 == 0 || P1 > credential->size) {
-            APDU_ReturnSW(SW_WRONG_P1P2);
+            SM_ReturnSW(SW_WRONG_P1P2);
           }
           TestZero(SIZE_M, public.apdu.data, flag);
           if (flag != 0) {
             debugWarning("Attribute cannot be empty");
-            APDU_ReturnSW(SW_WRONG_DATA);
+            SM_ReturnSW(SW_WRONG_DATA);
           }
 
           Copy(SIZE_M, credential->attribute[P1 - 1], public.apdu.data);
           debugIndexedCLMessage("Initialised attribute", credential->attribute, P1 - 1);
-          APDU_ReturnSW(SW_NO_ERROR);
+          SM_ReturnSW(SW_NO_ERROR);
 
         case INS_ISSUE_COMMITMENT:
           debugMessage("INS_ISSUE_COMMITMENT");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
           if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_STATZK)) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
 
           Copy(SIZE_STATZK, public.issue.nonce, public.apdu.data);
           debugNonce("Initialised nonce", public.issue.nonce);
           constructCommitment(credential, &masterSecret[0]);
           debugNumber("Returned U", public.apdu.data);
-          APDU_ReturnLa(SW_NO_ERROR, SIZE_N);
+          SM_ReturnLa(SW_NO_ERROR, SIZE_N);
 
         case INS_ISSUE_COMMITMENT_PROOF:
           debugMessage("INS_ISSUE_COMMITMENT_PROOF");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
           if (!(APDU_wrapped || CheckCase(1))) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
 
           switch (P1) {
@@ -477,55 +488,55 @@ void main(void) {
               debugMessage("P1_COMMITMENT_PROOF_C");
               Copy(SIZE_H, public.apdu.data, session.issue.challenge);
               debugHash("Returned c", public.apdu.data);
-              APDU_ReturnLa(SW_NO_ERROR, SIZE_H);
+              SM_ReturnLa(SW_NO_ERROR, SIZE_H);
 
             case P1_PROOF_VPRIMEHAT:
               debugMessage("P1_COMMITMENT_PROOF_VPRIMEHAT");
               Copy(SIZE_VPRIME_, public.apdu.data, session.issue.vPrimeHat);
               debugValue("Returned vPrimeHat", public.apdu.data, SIZE_VPRIME_);
-              APDU_ReturnLa(SW_NO_ERROR, SIZE_VPRIME_);
+              SM_ReturnLa(SW_NO_ERROR, SIZE_VPRIME_);
 
             case P1_PROOF_SHAT:
               debugMessage("P1_COMMITMENT_PROOF_SHAT");
               Copy(SIZE_S_, public.apdu.data, session.issue.sHat);
               debugValue("Returned s_A", public.apdu.data, SIZE_S_);
-              APDU_ReturnLa(SW_NO_ERROR, SIZE_S_);
+              SM_ReturnLa(SW_NO_ERROR, SIZE_S_);
 
             default:
               debugWarning("Unknown parameter");
-              APDU_ReturnSW(SW_WRONG_P1P2);
+              SM_ReturnSW(SW_WRONG_P1P2);
           }
 
         case INS_ISSUE_CHALLENGE:
           debugMessage("INS_ISSUE_CHALLENGE");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
           if (!(APDU_wrapped || CheckCase(1))) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
 
           Copy(SIZE_STATZK, public.apdu.data, credential->proof.nonce);
           debugNonce("Returned nonce", public.apdu.data);
-          APDU_ReturnLa(SW_NO_ERROR, SIZE_STATZK);
+          SM_ReturnLa(SW_NO_ERROR, SIZE_STATZK);
 
         case INS_ISSUE_SIGNATURE:
           debugMessage("INS_ISSUE_SIGNATURE");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
 
           switch(P1) {
             case P1_SIGNATURE_A:
               debugMessage("P1_SIGNATURE_A");
               if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_N)) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               Copy(SIZE_N, credential->signature.A, public.apdu.data);
@@ -535,7 +546,7 @@ void main(void) {
             case P1_SIGNATURE_E:
               debugMessage("P1_SIGNATURE_E");
               if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_E)) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               Copy(SIZE_E, credential->signature.e, public.apdu.data);
@@ -545,7 +556,7 @@ void main(void) {
             case P1_SIGNATURE_V:
               debugMessage("P1_SIGNATURE_V");
               if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_V)) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               constructSignature(credential);
@@ -555,33 +566,33 @@ void main(void) {
             case P1_SIGNATURE_VERIFY:
               debugMessage("P1_SIGNATURE_VERIFY");
               if (!(APDU_wrapped || CheckCase(1))) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
-              verifySignature(credential, &masterSecret[0]);
+              verifySignature(credential, &masterSecret[0], &session.vfySig);
               debugMessage("Verified signature");
               break;
 
             default:
               debugWarning("Unknown parameter");
-              APDU_ReturnSW(SW_WRONG_P1P2);
+              SM_ReturnSW(SW_WRONG_P1P2);
           }
-          APDU_ReturnSW(SW_NO_ERROR);
+          SM_ReturnSW(SW_NO_ERROR);
 
         case INS_ISSUE_SIGNATURE_PROOF:
           debugMessage("INS_ISSUE_SIGNATURE_PROOF");
           if (!CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
 
           switch(P1) {
             case P1_PROOF_C:
               debugMessage("P1_SIGNATURE_PROOF_C");
               if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_H)) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               Copy(SIZE_H, credential->proof.challenge, public.apdu.data);
@@ -591,7 +602,7 @@ void main(void) {
             case P1_PROOF_S_E:
               debugMessage("P1_SIGNATURE_PROOF_S_E");
               if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_N)) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               Copy(SIZE_N, credential->proof.response, public.apdu.data);
@@ -601,18 +612,18 @@ void main(void) {
             case P1_PROOF_VERIFY:
               debugMessage("P1_SIGNATURE_PROOF_VERIFY");
               if (!(APDU_wrapped || CheckCase(1))) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
-              verifyProof(credential);
+              verifyProof(credential, &session.vfyPrf, &public.vfyPrf);
               debugMessage("Verified proof");
               break;
 
             default:
               debugWarning("Unknown parameter");
-              APDU_ReturnSW(SW_WRONG_P1P2);
+              SM_ReturnSW(SW_WRONG_P1P2);
           }
-          APDU_ReturnSW(SW_NO_ERROR);
+          SM_ReturnSW(SW_NO_ERROR);
 
         //////////////////////////////////////////////////////////////
         // Disclosure / Proving instructions                        //
@@ -622,10 +633,10 @@ void main(void) {
           debugMessage("INS_PROVE_CREDENTIAL");
           if (!((APDU_wrapped || CheckCase(3)) &&
               (Lc == 2 + SIZE_H + 2 || Lc == 2 + SIZE_H + 2 + SIZE_TIMESTAMP || Lc == 2 + SIZE_H + 2 + SIZE_TIMESTAMP + SIZE_TERMINAL_ID))) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
           if (P1P2 != 0) {
-            APDU_ReturnSW(SW_WRONG_P1P2);
+            SM_ReturnSW(SW_WRONG_P1P2);
           }
 
           // Cleanup session
@@ -639,11 +650,16 @@ void main(void) {
             if (credentials[i].id == public.verificationSetup.id) {
               credential = &credentials[i];
 
-              selectAttributes(credential, public.verificationSetup.selection);
+              if (verifySelection(credential, public.verificationSetup.selection) < 0) {
+                credential = NULL;
+                SM_ReturnSW(SW_WRONG_DATA);
+              } else {
+                session.prove.disclose = public.verificationSetup.selection;
+              }
 
               if (CHV_required && !CHV_verified(credPIN)) {
                 credential = NULL;
-                APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+                SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
               }
 
               Copy(SIZE_H, public.prove.context, public.verificationSetup.context);
@@ -657,95 +673,95 @@ void main(void) {
               logEntry->credential = credential->id;
               logEntry->details.prove.selection = session.prove.disclose;
 
-              APDU_ReturnSW(SW_NO_ERROR);
+              SM_ReturnSW(SW_NO_ERROR);
             }
           }
-          APDU_ReturnSW(SW_REFERENCED_DATA_NOT_FOUND);
+          SM_ReturnSW(SW_REFERENCED_DATA_NOT_FOUND);
 
         case INS_PROVE_COMMITMENT:
           debugMessage("INS_PROVE_COMMITMENT");
           if (CHV_required && !CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
           if (!((APDU_wrapped || CheckCase(3)) && Lc == SIZE_STATZK)) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
 
           constructProof(credential, &masterSecret[0]);
           debugHash("Returned c", public.apdu.data);
-          APDU_ReturnLa(SW_NO_ERROR, SIZE_H);
+          SM_ReturnLa(SW_NO_ERROR, SIZE_H);
 
         case INS_PROVE_SIGNATURE:
           debugMessage("INS_PROVE_SIGNATURE");
           if (CHV_required && !CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
 
           switch(P1) {
             case P1_SIGNATURE_A:
               debugMessage("P1_SIGNATURE_A");
               if (!(APDU_wrapped || CheckCase(1))) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               Copy(SIZE_N, public.apdu.data, public.prove.APrime);
               debugNumber("Returned A'", public.apdu.data);
-              APDU_ReturnLa(SW_NO_ERROR, SIZE_N);
+              SM_ReturnLa(SW_NO_ERROR, SIZE_N);
 
             case P1_SIGNATURE_E:
               debugMessage("P1_SIGNATURE_E");
               if (!(APDU_wrapped || CheckCase(1))) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               Copy(SIZE_E_, public.apdu.data, public.prove.eHat);
               debugValue("Returned e^", public.apdu.data, SIZE_E_);
-              APDU_ReturnLa(SW_NO_ERROR, SIZE_E_);
+              SM_ReturnLa(SW_NO_ERROR, SIZE_E_);
 
             case P1_SIGNATURE_V:
               debugMessage("P1_SIGNATURE_V");
               if (!(APDU_wrapped || CheckCase(1))) {
-                APDU_ReturnSW(SW_WRONG_LENGTH);
+                SM_ReturnSW(SW_WRONG_LENGTH);
               }
 
               Copy(SIZE_V_, public.apdu.data, public.prove.vHat);
               debugValue("Returned v^", public.apdu.data, SIZE_V_);
-              APDU_ReturnLa(SW_NO_ERROR, SIZE_V_);
+              SM_ReturnLa(SW_NO_ERROR, SIZE_V_);
 
             default:
               debugWarning("Unknown parameter");
-              APDU_ReturnSW(SW_WRONG_P1P2);
+              SM_ReturnSW(SW_WRONG_P1P2);
           }
 
         case INS_PROVE_ATTRIBUTE:
           debugMessage("INS_PROVE_ATTRIBUTE");
           if (CHV_required && !CHV_verified(credPIN)) {
-            APDU_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+            SM_ReturnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
           }
           if (credential == NULL) {
-            APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
+            SM_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
           }
           if (!(APDU_wrapped || CheckCase(1))) {
-            APDU_ReturnSW(SW_WRONG_LENGTH);
+            SM_ReturnSW(SW_WRONG_LENGTH);
           }
           if (P1 > credential->size) {
-            APDU_ReturnSW(SW_WRONG_P1P2);
+            SM_ReturnSW(SW_WRONG_P1P2);
           }
 
           if (disclosed(P1)) {
             Copy(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
             debugValue("Returned attribute", public.apdu.data, SIZE_M);
-            APDU_ReturnLa(SW_NO_ERROR, SIZE_M);
+            SM_ReturnLa(SW_NO_ERROR, SIZE_M);
           } else {
             Copy(SIZE_M_, public.apdu.data, session.prove.mHat[P1]);
             debugValue("Returned response", public.apdu.data, SIZE_M_);
-            APDU_ReturnLa(SW_NO_ERROR, SIZE_M_);
+            SM_ReturnLa(SW_NO_ERROR, SIZE_M_);
           }
 
 

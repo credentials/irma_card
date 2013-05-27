@@ -22,7 +22,6 @@
 
 #include "CHV.h"
 
-#include "APDU.h"
 #include "debug.h"
 #include "memory.h"
 
@@ -35,21 +34,22 @@ unsigned char CHV_flags;
  *
  * @param buffer which contains the code to verify.
  */
-void CHV_PIN_verify(CHV_PIN *pin, unsigned char *buffer) {
+int CHV_PIN_verify(CHV_PIN *pin, unsigned char *buffer) {
   // Verify if the PIN has not been blocked
   if (pin->count == 0) {
-    APDU_ReturnSW(SW_COUNTER_PROVIDED_BY_X(0));
+    return CHV_BLOCKED;
   }
 
   // Compare the PIN with the stored code
   if (NotEqual(CHV_PIN_SIZE, buffer, pin->code)) {
     debugWarning("PIN verification failed");
     debugInteger("Tries left", pin->count - 1);
-    APDU_ReturnSW(SW_COUNTER_PROVIDED_BY_X(0) | --(pin->count));
+    return CHV_TRIES_LEFT * --(pin->count);
   } else {
     debugMessage("PIN verified ");
     pin->count = CHV_PIN_COUNT;
     CHV_flags |= pin->flag;
+    return CHV_VALID;
   }
 }
 
@@ -58,19 +58,24 @@ void CHV_PIN_verify(CHV_PIN *pin, unsigned char *buffer) {
  *
  * @param buffer which contains the old and new code
  */
-void CHV_PIN_update(CHV_PIN *pin, unsigned char *buffer) {
+int CHV_PIN_update(CHV_PIN *pin, unsigned char *buffer) {
   int i;
-  
+
   // Verify the original PIN
-  CHV_PIN_verify(pin, buffer);
+  i = CHV_PIN_verify(pin, buffer);
+  if (i <= 0) {
+    return i;
+  }
 
   // Verify the new PIN size
   for (i = 0; i < pin->minSize; i++) {
-	if (buffer[CHV_PIN_SIZE + i] == 0x00) {
-      APDU_ReturnSW(SW_WRONG_LENGTH);
+    if (buffer[CHV_PIN_SIZE + i] == 0x00) {
+      return CHV_WRONG_LENGTH;
     }
   }
 
   // Store the new code
   CopyBytes(CHV_PIN_SIZE, pin->code, buffer + CHV_PIN_SIZE);
+  pin->count = CHV_PIN_COUNT;
+  return CHV_VALID;
 }

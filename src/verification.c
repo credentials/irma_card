@@ -22,7 +22,6 @@
 
 #include "verification.h"
 
-#include "APDU.h"
 #include "debug.h"
 #include "math.h"
 #include "memory.h"
@@ -43,32 +42,28 @@ extern SessionData session;
  *
  * @param selection bitmask of attributes to be disclosed.
  */
-void selectAttributes(Credential *credential, int selection) {
+int verifySelection(Credential *credential, unsigned int selection) {
 
   // Never disclose the master secret.
   if ((selection & 0x0001) != 0) {
     debugError("selectAttributes(): master secret cannot be disclosed");
-    credential = NULL;
-    APDU_ReturnSW(SW_WRONG_DATA);
+    return VERIFICATION_ERROR_MASTER_SECRET;
   }
 
   // Always disclose the expiry attribute.
   if ((selection & 0x0002) == 0) {
     debugError("selectAttributes(): expiry attribute must be disclosed");
-    credential = NULL;
-    APDU_ReturnSW(SW_WRONG_DATA);
+    return VERIFICATION_ERROR_EXPIRY;
   }
 
   // Do not allow non-existant attributes.
   if ((selection & (0xFFFF << credential->size + 1)) != 0) {
     debugError("selectAttributes(): selection contains non-existant attributes");
-    credential = NULL;
-    APDU_ReturnSW(SW_REFERENCED_DATA_NOT_FOUND);
+    return VERIFICATION_ERROR_NOT_FOUND;
   }
 
-  // Set the attribute disclosure selection.
-  session.prove.disclose = selection;
-  debugInteger("Disclosure selection", session.prove.disclose);
+  debugInteger("Attribute disclosure selection", selection);
+  return VERIFICATION_SELECTION_VALID;
 }
 
 /**

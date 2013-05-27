@@ -27,7 +27,11 @@
 
 #define AUTH_CHALLENGE_BYTES 32
 
-unsigned char *authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert);
+int authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert, unsigned char *body);
+
+#define AUTH_CERTIFICATE_WRONG -2
+#define AUTH_CERTIFICATE_INVALID -1
+#define AUTH_CERTIFICATE_VALID 1
 
 void authentication_parseCertificate(unsigned char *cert);
 

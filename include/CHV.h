@@ -48,14 +48,19 @@ typedef struct {
  *
  * @param buffer which contains the code to verify.
  */
-void CHV_PIN_verify(CHV_PIN* pin, unsigned char *buffer);
+int CHV_PIN_verify(CHV_PIN* pin, unsigned char *buffer);
+
+#define CHV_BLOCKED 0
+#define CHV_TRIES_LEFT -1
+#define CHV_VALID 1
+#define CHV_WRONG_LENGTH -99
 
 /**
  * Modify a PIN code.
  *
  * @param buffer which contains the old and new code.
  */
-void CHV_PIN_update(CHV_PIN* pin, unsigned char *buffer);
+int CHV_PIN_update(CHV_PIN* pin, unsigned char *buffer);
 
 
 /**

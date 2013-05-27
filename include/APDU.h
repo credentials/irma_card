@@ -102,29 +102,29 @@
  */
 #define SW_BYTES_REMAINING(SW2)           0x61##SW2
 #define SW_COUNTER_PROVIDED_BY_X(X)       0x63C##X
-#define SW_WRONG_LENGTH	                  0x6700
+#define SW_WRONG_LENGTH                   0x6700
 #define SW_FUNCTIONS_IN_CLA_NOT_SUPPORTED 0x6800
 #define SW_LOGICAL_CHANNEL_NOT_SUPPORTED  0x6881
 #define SW_SECURE_MESSAGING_NOT_SUPPORTED 0x6882
 #define SW_COMMAND_NOT_ALLOWED            0x6900
 #define SW_SECURITY_STATUS_NOT_SATISFIED  0x6982
 #define SW_FILE_INVALID                   0x6983
-#define SW_DATA_INVALID	                  0x6984
-#define SW_CONDITIONS_NOT_SATISFIED	      0x6985
-#define SW_COMMAND_NOT_ALLOWED_AGAIN	  0x6986
+#define SW_DATA_INVALID                   0x6984
+#define SW_CONDITIONS_NOT_SATISFIED       0x6985
+#define SW_COMMAND_NOT_ALLOWED_AGAIN      0x6986
 #define SW_WRONG_PARAMS                   0x6A00
-#define SW_WRONG_DATA	                  0x6A80
+#define SW_WRONG_DATA                     0x6A80
 #define SW_FUNC_NOT_SUPPORTED             0x6A81
 #define SW_FILE_NOT_FOUND                 0x6A82
 #define SW_RECORD_NOT_FOUND               0x6A83
-#define SW_INCORRECT_P1P2 	              0x6A86
+#define SW_INCORRECT_P1P2                 0x6A86
 #define SW_REFERENCED_DATA_NOT_FOUND      0x6A88
-#define SW_WRONG_P1P2 	                  0x6B00
+#define SW_WRONG_P1P2                     0x6B00
 #define SW_CORRECT_LENGTH(SW2)            0x6C##SW2
 #define SW_INS_NOT_SUPPORTED              0x6D00
 #define SW_CLA_NOT_SUPPORTED              0x6E00
 #define SW_UNKNOWN                        0x6F00
-#define SW_NO_ERROR		                  0x9000
+#define SW_NO_ERROR                       0x9000
 
 #define TAG_ISO7816_FCI          0x6F
 #define TAG_PROPRIETARY_INFO     0x85

@@ -29,7 +29,12 @@
 /**
  * Select the attributes to be disclosed.
  */
-void selectAttributes(Credential *credential, int selection);
+int verifySelection(Credential *credential, unsigned int selection);
+
+#define VERIFICATION_ERROR_MASTER_SECRET -1
+#define VERIFICATION_ERROR_EXPIRY -2
+#define VERIFICATION_ERROR_NOT_FOUND -3
+#define VERIFICATION_SELECTION_VALID 1
 
 /**
  * Construct a proof.

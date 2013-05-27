@@ -74,12 +74,16 @@ typedef struct {
 /**
  * Unwrap an incomming command APDU from secure messaging
  */
-void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params);
+int SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params);
 
 /**
  * Wrap an outgoing response APDU for secure messaging
  */
 void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params);
+
+#define SM_ERROR_WRONG_DATA -1
+#define SM_ERROR_MAC_INVALID -2
+#define SM_ERROR_PADDING_INVALID -3
 
 /**
  * Add padding to the input data according to ISO7816-4
@@ -97,19 +101,19 @@ unsigned int SM_ISO7816_4_pad(unsigned char *data, unsigned int length);
  * @param length of the data including padding
  * @return the new size of the data excluding padding
  */
-int SM_ISO7816_4_unpad(unsigned char *data, unsigned int length);
+int SM_ISO7816_4_unpad(unsigned char *data, unsigned int *length);
 
-#define SM_ERROR_ISO7816_4_PADDING_INVALID -1
+#define SM_ISO7816_4_ERROR_PADDING_INVALID -1
 
 #define SM_ReturnSW(sw) \
   __SW = (sw); \
-  if (APDU_wrapped) { SM_wrap(public.apdu.data, public.apdu.session); } \
+  if (APDU_wrapped) { SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); } \
   __code(SYSTEM, 4)
 
 #define SM_ReturnLa(sw, la) \
   __SW = (sw); \
-  __La = (la); h\
-  if (APDU_wrapped) { SM_wrap(public.apdu.data, public.apdu.session); } \
+  __La = (la); \
+  if (APDU_wrapped) { SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); } \
   __code(SYSTEM, 4)
 
 #endif // __SM_H

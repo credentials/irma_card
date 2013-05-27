@@ -38,12 +38,18 @@ void constructSignature(Credential *credential);
 /**
  * (OPTIONAL) Verify the signature (round 3, part 2)
  */
-void verifySignature(Credential *credential, unsigned char *masterSecret);
+int verifySignature(Credential *credential, unsigned char *masterSecret, CLSignatureVerification *session);
+
+#define ISSUANCE_ERROR_SIGNATURE_INVALID -1
+#define ISSUANCE_SIGNATURE_VALID 1
 
 /**
  * (OPTIONAL) Verify the proof (round 3, part 3)
  */
-void verifyProof(Credential *credential);
+int verifyProof(Credential *credential, IssuanceProofSession *session, IssuanceProofVerification *public);
+
+#define ISSUANCE_ERROR_PROOF_INVALID -1
+#define ISSUANCE_PROOF_VALID 1
 
 /**
  * Compute the response value vPrimeHat = vPrimeTilde + c*vPrime
