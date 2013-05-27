@@ -24,7 +24,7 @@
 #define __types_H
 
 #include "RSA.h"
-#include "authentication.h"
+#include "auth.h"
 #include "sizes.h"
 
 #ifndef NULL

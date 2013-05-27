@@ -1,5 +1,5 @@
 /**
- * authentication.h
+ * auth.h
  *
  * This file is part of IRMAcard.
  *

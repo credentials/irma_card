@@ -1,5 +1,5 @@
 /**
- * authentication.c
+ * auth.c
  *
  * This file is part of IRMAcard.
  *
@@ -20,7 +20,7 @@
  *   Pim Vullers <pim@cs.ru.nl>, Radboud University Nijmegen.
  */
 
-#include "authentication.h"
+#include "auth.h"
 
 #include "ASN1.h"
 #include "debug.h"

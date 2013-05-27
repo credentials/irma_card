@@ -28,7 +28,7 @@
 #include "types.h"
 #include "types.debug.h"
 #include "APDU.h"
-#include "authentication.h"
+#include "auth.h"
 #include "CHV.h"
 #include "debug.h"
 #include "issuance.h"
