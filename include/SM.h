@@ -23,6 +23,8 @@
 #ifndef __SM_H
 #define __SM_H
 
+#include "APDU.h"
+
 #include "SM.config.h"
 
 #ifndef SM_CBC_sign
@@ -115,5 +117,9 @@ int SM_ISO7816_4_unpad(unsigned char *data, unsigned int *length);
   __La = (la); \
   if (APDU_wrapped) { SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); } \
   __code(SYSTEM, 4)
+
+#define SM_return() \
+  SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); \
+  __code(SYSTEM, 4);
 
 #endif // __SM_H

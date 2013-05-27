@@ -25,6 +25,11 @@
 
 #include "MULTOS.h"
 
+typedef struct {
+  unsigned int SW;
+  unsigned int La;
+} APDU_SWLa;
+
 /*
  * CLAss bytes
  */
@@ -134,14 +139,43 @@
 #define APDU_wrapped ((CLA & CLA_SECURE_MESSAGING) != 0)
 #define APDU_chained ((CLA & CLA_COMMAND_CHAINING) != 0)
 
+#define APDU_checkP1(value) \
+  if (P1 != value) { APDU_returnSW(SW_WRONG_P1P2); }
+
+#define APDU_checkP2(value) \
+  if (P2 != value) { APDU_returnSW(SW_WRONG_P1P2); }
+
+#define APDU_checkP1P2(value) \
+  if (P1P2 != value) { APDU_returnSW(SW_WRONG_P1P2); }
+
+#define APDU_checkLength(length) \
+  if (Lc != (length)) { APDU_returnSW(SW_WRONG_LENGTH); }
+
+
 #define APDU_ReturnSW(sw) \
   __SW = (sw); \
   __code(SYSTEM, 4)
 
-#define APDU_ReturnLa(sw, len) \
+#define APDU_ReturnSWLa(sw, len) \
   __SW = (sw); \
   __La = (len); \
   __code(SYSTEM, 4)
+
+#define APDU_return() \
+  APDU_returnSW(SW_NO_ERROR);
+
+#define APDU_returnLa(la) \
+  APDU_returnSWLa(SW_NO_ERROR, la);
+
+#define APDU_returnSW(sw) \
+  __SW = (sw); \
+  return;
+
+#define APDU_returnSWLa(sw, la) \
+  __SW = (sw); \
+  __La = (la); \
+  return;
+
 
 extern unsigned char CLA;
 extern unsigned char INS;
