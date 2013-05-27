@@ -23,8 +23,8 @@
 #include "RSA.h"
 
 #include "debug.h"
+#include "math.h"
 #include "memory.h"
-#include "arithmetic.h"
 #include "random.h"
 #include "SHA.h"
 

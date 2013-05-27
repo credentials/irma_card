@@ -59,12 +59,9 @@ PublicData public;
 SessionData session; // 389
 Credential *credential; // + 2 = 669
 Byte flags; // + 1 = 670
-Byte flag;
 
-// Secure messaging: send sequence counter and session keys
-Counter ssc; // 8
-Byte key_enc[SIZE_KEY];
-Byte key_mac[SIZE_KEY];
+// Secure messaging: session parameters
+SM_parameters tunnel;
 Byte terminal[SIZE_TERMINAL_ID];
 
 /********************************************************************/
@@ -94,9 +91,6 @@ CHV_PIN credPIN = {
 RSA_public_key cardKey;
 RSA_public_key caKey;
 
-// Secure messaging: initialisation vector
-Byte iv[SIZE_IV];
-
 // Logging
 Log log;
 IRMALogEntry *logEntry;
@@ -106,6 +100,7 @@ IRMALogEntry *logEntry;
 /********************************************************************/
 
 void main(void) {
+  unsigned char flag;
   int i;
 
   // Check whether the APDU has been APDU_wrapped for secure messaging
@@ -113,7 +108,7 @@ void main(void) {
     if (!CheckCase(4)) {
       APDU_ReturnSW(SW_WRONG_LENGTH);
     }
-    SM_APDU_unwrap(public.apdu.data, public.apdu.session, &ssc[0], &iv[0], &key_enc[0], &key_mac[0]);
+    SM_APDU_unwrap(public.apdu.data, public.apdu.session, &tunnel);
     debugValue("Unwrapped APDU", public.apdu.data, Lc);
   }
 

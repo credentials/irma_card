@@ -27,12 +27,14 @@
 
 #define DES_2KEY_BITS 128
 #define DES_3KEY_BITS 192
-#define DES_IV_BITS 64
+#define DES_BLOCK_BITS 64
+#define DES_IV_BITS DES_BLOCK_BITS
 
 #define DES_BITS_TO_BYTES(bits) ((bits + 7) /8)
 
 #define DES_2KEY_BYTES DES_BITS_TO_BYTES(DES_2KEY_BITS)
 #define DES_3KEY_BYTES DES_BITS_TO_BYTES(DES_3KEY_BITS)
+#define DES_BLOCK_BYTES DES_BITS_TO_BYTES(DES_BLOCK_BITS)
 #define DES_IV_BYTES DES_BITS_TO_BYTES(DES_IV_BITS)
 
 #define DES_CBC_sign(message_bytes, iv, key, signature, message) \

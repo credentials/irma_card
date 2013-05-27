@@ -23,11 +23,12 @@
 #include "SM.h"
 
 #include "APDU.h"
-#include "arithmetic.h"
 #include "debug.h"
-#include "DES.h"
+#include "math.h"
 #include "memory.h"
-#include "sizes.h"
+
+// Secure messaging: initialisation vector
+unsigned char SM_IV[SM_IV_BYTES];
 
 /********************************************************************/
 /* Secure Messaging functions                                       */
@@ -36,15 +37,15 @@
 /**
  * Unwrap a command APDU from secure messaging
  */
-void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc, unsigned char *iv, unsigned char *key_enc, unsigned char *key_mac) {
-  unsigned char mac[SIZE_MAC];
+void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params) {
+  unsigned char mac[SM_MAC_BYTES];
   int i;
   unsigned int offset = 0;
   unsigned int do87DataLen = 0;
   unsigned int do87Data_p = 0;
   unsigned int do87LenBytes = 0;
 
-  IncrementBytes(SIZE_SSC, ssc);
+  IncrementBytes(SM_SSC_BYTES, params->ssc);
 
   if (apdu[offset] == 0x87) { // do87
     if (apdu[++offset] > 0x80) {
@@ -80,8 +81,8 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, unsigned char *s
   i = 0;
 
   // SSC
-  Copy(SIZE_SSC, buffer, ssc);
-  i += SIZE_SSC;
+  Copy(SM_SSC_BYTES, buffer, params->ssc);
+  i += SM_SSC_BYTES;
 
   // Header
   buffer[i++] = CLA;
@@ -101,14 +102,14 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, unsigned char *s
   i = SM_ISO7816_4_pad(buffer, i);
 
   // Verify the MAC
-  DES_CBC_sign(i, iv, key_mac, mac, buffer);
-  if (NotEqual(SIZE_MAC, mac, apdu + offset + 2)) {
+  SM_CBC_sign(i, SM_IV, params->key_mac, mac, buffer);
+  if (NotEqual(SM_MAC_BYTES, mac, apdu + offset + 2)) {
     APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
   }
 
   // Decrypt data if available
   if (do87DataLen != 0) {
-    DES_CBC_decrypt(do87DataLen, buffer + do87Data_p, apdu, iv, DES_2KEY_BYTES, key_enc);
+    SM_CBC_decrypt(do87DataLen, buffer + do87Data_p, apdu, SM_IV, SM_KEY_BYTES, params->key_enc);
     i = SM_ISO7816_4_unpad(apdu, do87DataLen);
     if (i < 0) {
       APDU_ReturnSW(SW_CONDITIONS_NOT_SATISFIED);
@@ -121,12 +122,12 @@ void SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, unsigned char *s
 /**
  * Wrap a response APDU for secure messaging
  */
-void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc, unsigned char *iv, unsigned char *key_enc, unsigned char *key_mac) {
+void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *params) {
   unsigned int offset = 0, do87DataLen = __La + 1;
   unsigned char do87DataLenBytes = __La > 0xff ? 2 : 1;
   int i;
 
-  IncrementBytes(SIZE_SSC, ssc);
+  IncrementBytes(SM_SSC_BYTES, params->ssc);
 
   if(__La > 0) {
     // Padding
@@ -145,7 +146,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc
     buffer[offset++] = 0x01;
 
     // Build the do87 data
-    DES_CBC_encrypt(__La, apdu, buffer + offset, iv, DES_2KEY_BYTES, key_enc);
+    SM_CBC_encrypt(__La, apdu, buffer + offset, SM_IV, SM_KEY_BYTES, params->key_enc);
     offset += __La;
   }
 
@@ -159,8 +160,8 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc
   i = SM_ISO7816_4_pad(buffer, offset);
 
   // calculate and write mac
-  Copy(SIZE_SSC, buffer - SIZE_SSC, ssc);
-  DES_CBC_sign(i + SIZE_SSC, iv, key_mac, apdu + offset + 2, buffer - SIZE_SSC);
+  Copy(SM_SSC_BYTES, buffer - SM_SSC_BYTES, params->ssc);
+  SM_CBC_sign(i + SM_SSC_BYTES, SM_IV, params->key_mac, apdu + offset + 2, buffer - SM_SSC_BYTES);
 
   // write do8e
   buffer[offset++] = 0x8e;
@@ -178,7 +179,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, unsigned char *ssc
  * @param length of the data that needs to be padded
  * @return the new size of the data including padding
  */
-unsigned int SM_ISO7816_4_pad(unsigned char *data, int length) {
+unsigned int SM_ISO7816_4_pad(unsigned char *data, unsigned int length) {
   data[length++] = 0x80;
   while (length % 8 != 0) {
     data[length++] = 0x00;
@@ -200,4 +201,50 @@ int SM_ISO7816_4_unpad(unsigned char *data, unsigned int length) {
     return SM_ERROR_ISO7816_4_PADDING_INVALID;
   }
   return length;
+}
+
+/**
+ * Derive session key from a given key seed and mode
+ *
+ * @param key to be stored
+ * @param mode for which a key needs to be derived
+ */
+void SM_session_key(unsigned int seed_bytes, unsigned char *seed, unsigned char *key, unsigned char mode) {
+  int i, j, bits;
+
+  // Derive the session key for mode
+  seed[seed_bytes + 0] = 0x00;
+  seed[seed_bytes + 1] = 0x00;
+  seed[seed_bytes + 2] = 0x00;
+  seed[seed_bytes + 3] = mode;
+  SHA(SM_SHA_BYTES, key, seed_bytes + 4, seed);
+
+#ifdef SM_DES
+  // Compute the parity bits
+  for (i = 0; i < SM_KEY_BYTES; i++) {
+    for (j = 0, bits = 0; j < 8; j++) {
+      bits += (key[i] >> j) & 0x01;
+    }
+    if (bits % 2 == 0) {
+      key[i] ^= 0x01;
+    }
+  }
+#endif // SM_DES
+}
+
+/**
+ * Derive session keys from a given key seed
+ */
+void SM_setup(unsigned int seed_bytes, unsigned char *seed, SM_parameters *params) {
+  unsigned char key_tmp[SM_SHA_BYTES];
+
+  // Derive the session key for encryption
+  SM_session_key(seed_bytes, seed, key_tmp, 0x01);
+  Copy(SM_KEY_BYTES, params->key_enc, key_tmp);
+  Copy(4, params->ssc, key_tmp + SM_KEY_BYTES);
+
+  // Derive the session key for authentication
+  SM_session_key(seed_bytes, seed, key_tmp, 0x02);
+  Copy(SM_KEY_BYTES, params->key_mac, key_tmp);
+  Copy(4, params->ssc + 4, key_tmp + SM_KEY_BYTES);
 }

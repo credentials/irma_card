@@ -1,5 +1,5 @@
 /**
- * arithmetic.h
+ * math.h
  *
  * This file is part of IRMAcard.
  *
@@ -20,8 +20,8 @@
  *   Pim Vullers <pim@cs.ru.nl>, Radboud University Nijmegen.
  */
 
-#ifndef __ARITHMETIC_H
-#define __ARITHMETIC_H
+#ifndef __MATH_H
+#define __MATH_H
 
 #include "MULTOS.h"
 
@@ -90,4 +90,4 @@ do { \
   __code(STORE, &flag, 1); \
 } while (0)
 
-#endif // __ARITHMETIC_H
+#endif // __MATH_H

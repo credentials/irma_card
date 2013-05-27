@@ -25,12 +25,22 @@
 
 #include "MULTOS.h"
 
-#define AES_KEY_BITS 128
-#define AES_IV_BITS 128
+#ifndef AES_KEY_BITS
+  #error "AES_KEY_BITS not defined"
+#endif // !AES_KEY_BITS
+
+#ifndef AES_BLOCK_BITS
+  #error "AES_BLOCK_BITS not defined"
+#endif // !AES_BLOCK_BITS
+
+#ifndef AES_IV_BITS
+  #error "AES_IV_BITS not defined"
+#endif // !AES_IV_BITS
 
 #define AES_BITS_TO_BYTES(bits) ((bits + 7) /8)
 
 #define AES_KEY_BYTES AES_BITS_TO_BYTES(AES_KEY_BITS)
+#define AES_BLOCK_BYTES AES_BITS_TO_BYTES(AES_BLOCK_BITS)
 #define AES_IV_BYTES AES_BITS_TO_BYTES(AES_IV_BITS)
 
 #define AES_CBC_sign(message_bytes, iv, key, signature, message) \

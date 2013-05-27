@@ -22,12 +22,12 @@
 
 #include "utils.h"
 
-#include "debug.h"
-#include "types.h"
-#include "SHA.h"
 #include "ASN1.h"
+#include "debug.h"
+#include "math.h"
 #include "memory.h"
-#include "arithmetic.h"
+#include "SHA.h"
+#include "types.h"
 
 /********************************************************************/
 /* Cryptographic helper functions                                   */
@@ -115,17 +115,14 @@ void ModExpSpecial(Credential *credential, int size, ByteArray exponent, ByteArr
  * @param buffer to be cleared
  */
 void ClearBytes(int size, void *buffer) {
-  int offset = 0;
-
   while (size > 255) {
-//    __code(CLEARN, buffer, 255);
-    __push(((unsigned char *) buffer) + offset);
+    __push(buffer);
     __code(PUSHZ, 255);
     __code(STOREI, 255);
-    offset += 255;
+    buffer = ((unsigned char *) buffer) + 255;
     size -= 255;
   }
-  Fill(size, ((unsigned char *) buffer) + offset, 0x00);
+  Fill(size, buffer, 0x00);
 }
 
 /**

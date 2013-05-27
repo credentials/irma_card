@@ -23,8 +23,8 @@
 #include "issuance.h"
 
 #include "APDU.h"
-#include "arithmetic.h"
 #include "debug.h"
+#include "math.h"
 #include "memory.h"
 #include "random.h"
 #include "sizes.h"
