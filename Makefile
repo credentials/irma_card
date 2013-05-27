@@ -13,9 +13,9 @@ SOURCES=$(wildcard $(SRCDIR)/*.c)
 SMARTCARD=$(BINDIR)/IRMAcard.smartcard-$(PLATFORM).alu
 SIMULATOR=$(BINDIR)/IRMAcard.simulator-$(PLATFORM).hzx
 
-fresh: clean all
-
 all: simulator smartcard
+
+fresh: clean all
 
 $(BINDIR):
 	mkdir -p $(BINDIR)
