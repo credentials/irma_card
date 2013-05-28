@@ -71,6 +71,7 @@ int CHV_PIN_update(CHV_PIN* pin, unsigned char *buffer);
 /**
  * Whether a PIN code is required.
  */
-#define CHV_required (((credential->userFlags.protect | credential->issuerFlags.protect) & session.prove.disclose) != 0)
+#define verifyProtection(credential, selection) \
+ (((credential->userFlags.protect | credential->issuerFlags.protect) & selection) != 0)
 
 #endif // __CHV_H

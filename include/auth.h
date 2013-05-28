@@ -25,6 +25,19 @@
 
 #include "RSA.h"
 
+#define POLICY_MAX_SIZE 8
+typedef struct {
+  unsigned int id;
+  unsigned int mask;
+} PolEntry;
+
+typedef struct{
+  PolEntry list[POLICY_MAX_SIZE];
+  unsigned char size;
+} Policy;
+
+
+
 #define AUTH_CHALLENGE_BYTES 32
 
 int authentication_verifyCertificate(RSA_public_key *key, unsigned char *cert, unsigned char *body);
@@ -39,5 +52,22 @@ void authentication_generateChallenge(RSA_public_key *key, unsigned char *nonce,
 
 void authentication_authenticateTerminal(unsigned char *response, unsigned char *nonce);
 
+#define AUTH_POLICY_ALLOWED 1
+#define AUTH_POLICY_NOT_ALLOWED -1
+
+#define AUTH_POLICY_MASK_ISSUANCE 0x0001
+#define AUTH_POLICY_MASK_OVERWRITE (AUTH_POLICY_MASK_ISSUANCE | 0x0002)
+#define AUTH_POLICY_MASK_SELECTION 0xFFFE
+
+int auth_checkPolicy(const Policy *policy, unsigned int id, unsigned int mask);
+
+#define auth_checkIssuance(policy, id) \
+  auth_checkPolicy(policy, id, AUTH_POLICY_MASK_ISSUANCE)
+
+#define auth_checkOverwrite(policy, id) \
+  auth_checkPolicy(policy, id, AUTH_POLICY_MASK_OVERWRITE)
+
+#define auth_checkSelection(policy, id, selection) \
+  auth_checkPolicy(policy, id, (selection) & AUTH_POLICY_MASK_SELECTION)
 
 #endif // __authentication_H

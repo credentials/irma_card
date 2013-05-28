@@ -72,3 +72,16 @@ void authentication_generateChallenge(RSA_public_key *key, unsigned char *nonce,
   RandomBytes(nonce, AUTH_CHALLENGE_BYTES);
   RSA_OAEP_encrypt(challenge, key, AUTH_CHALLENGE_BYTES, nonce, 0, NULL);
 }
+
+
+int auth_checkPolicy(const Policy *policy, unsigned int id, unsigned int mask) {
+  unsigned char i;
+
+  for (i = 0; i < policy->size; i++) {
+    if (policy->list[i].id == id && (policy->list[i].mask & mask) == mask) {
+      return AUTH_POLICY_ALLOWED;
+    }
+  }
+
+  return AUTH_POLICY_NOT_ALLOWED;
+}

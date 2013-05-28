@@ -62,6 +62,7 @@ Byte flags; // + 1 = 670
 
 // Secure messaging: session parameters
 SM_parameters tunnel;
+Policy policy;
 Byte terminal[SIZE_TERMINAL_ID];
 
 /********************************************************************/
@@ -343,224 +344,241 @@ void processIssuance(void) {
     APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
   }
 
-  // A credential should be selected, except for issuance setup.
-  if (credential == NULL && INS != INS_ISSUE_CREDENTIAL) {
-    APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
-  }
+  // Special case: start issuance
+  if (INS == INS_ISSUE_CREDENTIAL) {
+    debugMessage("INS_ISSUE_CREDENTIAL");
+    APDU_checkLength(sizeof(IssuanceSetup));
 
-  switch (INS) {
-    case INS_ISSUE_CREDENTIAL:
-      debugMessage("INS_ISSUE_CREDENTIAL");
-      APDU_checkLength(sizeof(CredentialIdentifier) + sizeof(Hash) + sizeof(Size) + sizeof(CredentialFlags) + SIZE_TIMESTAMP);
+    // Start a new issuance session
+    credential = NULL;
 
-      // Prevent reissuance of a credential
-      for (i = 0; i < MAX_CRED; i++) {
-        if (credentials[i].id == public.issuanceSetup.id) {
-          debugWarning("Credential already exists");
+    // Check policy
+    if (!auth_checkIssuance(&policy, public.issuanceSetup.id)) {
+      APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
+    }
+
+    // Locate a credential slot
+    for (i = 0; i < MAX_CRED; i++) {
+      // Reuse the existing credential slot.
+      if (credentials[i].id == public.issuanceSetup.id) {
+        debugMessage("Credential already exists");
+        if (!auth_checkOverwrite(&policy, public.issuanceSetup.id)) {
+          debugWarning("Overwrite not allowed");
           APDU_returnSW(SW_COMMAND_NOT_ALLOWED_AGAIN);
-        }
-      }
-
-      // Create a new credential
-      for (i = 0; i < MAX_CRED; i++) {
-        if (credentials[i].id == 0) {
+        } else {
           credential = &credentials[i];
-          credential->id = public.issuanceSetup.id;
-          credential->size = public.issuanceSetup.size;
-          credential->issuerFlags = public.issuanceSetup.flags;
-          Copy(SIZE_H, credential->proof.context, public.issuanceSetup.context);
-          debugHash("Initialised context", credential->proof.context);
-
-          // Create new log entry
-          logEntry = (IRMALogEntry*) log_new_entry(&log);
-          Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.issuanceSetup.timestamp);
-          Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
-          logEntry->action = ACTION_ISSUE;
-          logEntry->credential = credential->id;
-
-          APDU_return();
+          break;
         }
-      }
 
-      // Out of space (all credential slots are occupied)
+      // Use a new credential slot
+      } else if (credentials[i].id == 0 && credential == NULL) {
+        debugMessage("Found empty slot");
+        credential = &credentials[i];
+      }
+    }
+
+    // No credential slot selected, out of space
+    if (credential == NULL) {
       debugWarning("Cannot issue another credential");
       APDU_returnSW(SW_COMMAND_NOT_ALLOWED);
+    }
 
-    case INS_ISSUE_PUBLIC_KEY:
-      debugMessage("INS_ISSUE_PUBLIC_KEY");
-      APDU_checkLength(SIZE_N);
+    // Initialise the credential
+    credential->id = public.issuanceSetup.id;
+    credential->size = public.issuanceSetup.size;
+    credential->issuerFlags = public.issuanceSetup.flags;
+    Copy(SIZE_H, credential->proof.context, public.issuanceSetup.context);
+    debugHash("Initialised context", credential->proof.context);
 
-      switch (P1) {
-        case P1_PUBLIC_KEY_N:
-          debugMessage("P1_PUBLIC_KEY_N");
-          Copy(SIZE_N, credential->issuerKey.n, public.apdu.data);
-          debugNumber("Initialised isserKey.n", credential->issuerKey.n);
-          break;
+    // Create new log entry
+    logEntry = (IRMALogEntry*) log_new_entry(&log);
+    Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.issuanceSetup.timestamp);
+    Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+    logEntry->action = ACTION_ISSUE;
+    logEntry->credential = credential->id;
 
-        case P1_PUBLIC_KEY_Z:
-          debugMessage("P1_PUBLIC_KEY_Z");
-          Copy(SIZE_N, credential->issuerKey.Z, public.apdu.data);
-          debugNumber("Initialised isserKey.Z", credential->issuerKey.Z);
-          break;
+    APDU_return();
 
-        case P1_PUBLIC_KEY_S:
-          debugMessage("P1_PUBLIC_KEY_S");
-          Copy(SIZE_N, credential->issuerKey.S, public.apdu.data);
-          debugNumber("Initialised isserKey.S", credential->issuerKey.S);
-          ComputeS_(credential, public.issue.buffer.data);
-          debugNumber("Initialised isserKey.S_", credential->issuerKey.S_);
-          break;
+  // All other issuance commands
+  } else {
 
-        case P1_PUBLIC_KEY_R:
-          debugMessage("P1_PUBLIC_KEY_R");
-          if (P2 > MAX_ATTR) {
-            SM_ReturnSW(SW_WRONG_P1P2);
-          }
-          Copy(SIZE_N, credential->issuerKey.R[P2], public.apdu.data);
-          debugIndexedNumber("Initialised isserKey.R", credential->issuerKey.R, P2);
-          break;
+    // A credential should be selected
+    if (credential == NULL) {
+      APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
+    }
 
-        default:
-          debugWarning("Unknown parameter");
-          SM_ReturnSW(SW_WRONG_P1P2);
-      }
-      APDU_return();
+    switch (INS) {
+      case INS_ISSUE_PUBLIC_KEY:
+        debugMessage("INS_ISSUE_PUBLIC_KEY");
+        APDU_checkLength(SIZE_N);
 
-    case INS_ISSUE_ATTRIBUTES:
-      debugMessage("INS_ISSUE_ATTRIBUTES");
-      APDU_checkLength(SIZE_M);
+        switch (P1) {
+          case P1_PUBLIC_KEY_N:
+            debugMessage("P1_PUBLIC_KEY_N");
+            Copy(SIZE_N, credential->issuerKey.n, public.apdu.data);
+            debugNumber("Initialised isserKey.n", credential->issuerKey.n);
+            break;
 
-      if (P1 == 0 || P1 > credential->size) {
-        APDU_returnSW(SW_WRONG_P1P2);
-      }
-      TestZero(SIZE_M, public.apdu.data, flag);
-      if (flag != 0) {
-        debugWarning("Attribute cannot be empty");
-        APDU_returnSW(SW_WRONG_DATA);
-      }
+          case P1_PUBLIC_KEY_Z:
+            debugMessage("P1_PUBLIC_KEY_Z");
+            Copy(SIZE_N, credential->issuerKey.Z, public.apdu.data);
+            debugNumber("Initialised isserKey.Z", credential->issuerKey.Z);
+            break;
 
-      Copy(SIZE_M, credential->attribute[P1 - 1], public.apdu.data);
-      debugIndexedCLMessage("Initialised attribute", credential->attribute, P1 - 1);
-      APDU_return();
+          case P1_PUBLIC_KEY_S:
+            debugMessage("P1_PUBLIC_KEY_S");
+            Copy(SIZE_N, credential->issuerKey.S, public.apdu.data);
+            debugNumber("Initialised isserKey.S", credential->issuerKey.S);
+            ComputeS_(credential, public.issue.buffer.data);
+            debugNumber("Initialised isserKey.S_", credential->issuerKey.S_);
+            break;
 
-    case INS_ISSUE_COMMITMENT:
-      debugMessage("INS_ISSUE_COMMITMENT");
-      APDU_checkLength(SIZE_STATZK);
+          case P1_PUBLIC_KEY_R:
+            debugMessage("P1_PUBLIC_KEY_R");
+            APDU_checkP2upper(credential->size + 1);
+            Copy(SIZE_N, credential->issuerKey.R[P2], public.apdu.data);
+            debugIndexedNumber("Initialised isserKey.R", credential->issuerKey.R, P2);
+            break;
 
-      Copy(SIZE_STATZK, public.issue.nonce, public.apdu.data);
-      debugNonce("Initialised nonce", public.issue.nonce);
-      constructCommitment(credential, &masterSecret[0]);
-      debugNumber("Returned U", public.apdu.data);
-      APDU_returnLa(SIZE_N);
+          default:
+            debugWarning("Unknown parameter");
+            APDU_returnSW(SW_WRONG_P1P2);
+        }
+        APDU_return();
 
-    case INS_ISSUE_COMMITMENT_PROOF:
-      debugMessage("INS_ISSUE_COMMITMENT_PROOF");
-      APDU_checkLength(0);
+      case INS_ISSUE_ATTRIBUTES:
+        debugMessage("INS_ISSUE_ATTRIBUTES");
+        APDU_checkLength(SIZE_M);
+        APDU_checkP1range(1, credential->size);
+        TestZero(SIZE_M, public.apdu.data, flag);
+        if (flag != 0) {
+          debugWarning("Attribute cannot be empty");
+          APDU_returnSW(SW_WRONG_DATA);
+        }
 
-      switch (P1) {
-        case P1_PROOF_C:
-          debugMessage("P1_COMMITMENT_PROOF_C");
-          Copy(SIZE_H, public.apdu.data, session.issue.challenge);
-          debugHash("Returned c", public.apdu.data);
-          APDU_returnLa(SIZE_H);
+        Copy(SIZE_M, credential->attribute[P1 - 1], public.apdu.data);
+        debugIndexedCLMessage("Initialised attribute", credential->attribute, P1 - 1);
+        APDU_return();
 
-        case P1_PROOF_VPRIMEHAT:
-          debugMessage("P1_COMMITMENT_PROOF_VPRIMEHAT");
-          Copy(SIZE_VPRIME_, public.apdu.data, session.issue.vPrimeHat);
-          debugValue("Returned vPrimeHat", public.apdu.data, SIZE_VPRIME_);
-          APDU_returnLa(SIZE_VPRIME_);
+      case INS_ISSUE_COMMITMENT:
+        debugMessage("INS_ISSUE_COMMITMENT");
+        APDU_checkLength(SIZE_STATZK);
 
-        case P1_PROOF_SHAT:
-          debugMessage("P1_COMMITMENT_PROOF_SHAT");
-          Copy(SIZE_S_, public.apdu.data, session.issue.sHat);
-          debugValue("Returned s_A", public.apdu.data, SIZE_S_);
-          APDU_returnLa(SIZE_S_);
+        Copy(SIZE_STATZK, public.issue.nonce, public.apdu.data);
+        debugNonce("Initialised nonce", public.issue.nonce);
+        constructCommitment(credential, &masterSecret[0]);
+        debugNumber("Returned U", public.apdu.data);
+        APDU_returnLa(SIZE_N);
 
-        default:
-          debugWarning("Unknown parameter");
-          APDU_returnSW(SW_WRONG_P1P2);
-      }
+      case INS_ISSUE_COMMITMENT_PROOF:
+        debugMessage("INS_ISSUE_COMMITMENT_PROOF");
+        APDU_checkLength(0);
 
-    case INS_ISSUE_CHALLENGE:
-      debugMessage("INS_ISSUE_CHALLENGE");
-      APDU_checkLength(0);
+        switch (P1) {
+          case P1_PROOF_C:
+            debugMessage("P1_COMMITMENT_PROOF_C");
+            Copy(SIZE_H, public.apdu.data, session.issue.challenge);
+            debugHash("Returned c", public.apdu.data);
+            APDU_returnLa(SIZE_H);
 
-      Copy(SIZE_STATZK, public.apdu.data, credential->proof.nonce);
-      debugNonce("Returned nonce", public.apdu.data);
-      APDU_returnLa(SIZE_STATZK);
+          case P1_PROOF_VPRIMEHAT:
+            debugMessage("P1_COMMITMENT_PROOF_VPRIMEHAT");
+            Copy(SIZE_VPRIME_, public.apdu.data, session.issue.vPrimeHat);
+            debugValue("Returned vPrimeHat", public.apdu.data, SIZE_VPRIME_);
+            APDU_returnLa(SIZE_VPRIME_);
 
-    case INS_ISSUE_SIGNATURE:
-      debugMessage("INS_ISSUE_SIGNATURE");
+          case P1_PROOF_SHAT:
+            debugMessage("P1_COMMITMENT_PROOF_SHAT");
+            Copy(SIZE_S_, public.apdu.data, session.issue.sHat);
+            debugValue("Returned s_A", public.apdu.data, SIZE_S_);
+            APDU_returnLa(SIZE_S_);
 
-      switch(P1) {
-        case P1_SIGNATURE_A:
-          debugMessage("P1_SIGNATURE_A");
-          APDU_checkLength(SIZE_N);
-          Copy(SIZE_N, credential->signature.A, public.apdu.data);
-          debugNumber("Initialised signature.A", credential->signature.A);
-          break;
+          default:
+            debugWarning("Unknown parameter");
+            APDU_returnSW(SW_WRONG_P1P2);
+        }
 
-        case P1_SIGNATURE_E:
-          debugMessage("P1_SIGNATURE_E");
-          APDU_checkLength(SIZE_E);
-          Copy(SIZE_E, credential->signature.e, public.apdu.data);
-          debugValue("Initialised signature.e", credential->signature.e, SIZE_E);
-          break;
+      case INS_ISSUE_CHALLENGE:
+        debugMessage("INS_ISSUE_CHALLENGE");
+        APDU_checkLength(0);
 
-        case P1_SIGNATURE_V:
-          debugMessage("P1_SIGNATURE_V");
-          APDU_checkLength(SIZE_V);
-          constructSignature(credential);
-          debugValue("Initialised signature.v", credential->signature.v, SIZE_V);
-          break;
+        Copy(SIZE_STATZK, public.apdu.data, credential->proof.nonce);
+        debugNonce("Returned nonce", public.apdu.data);
+        APDU_returnLa(SIZE_STATZK);
 
-        case P1_SIGNATURE_VERIFY:
-          debugMessage("P1_SIGNATURE_VERIFY");
-          APDU_checkLength(0);
-          verifySignature(credential, &masterSecret[0], &session.vfySig);
-          debugMessage("Verified signature");
-          break;
+      case INS_ISSUE_SIGNATURE:
+        debugMessage("INS_ISSUE_SIGNATURE");
 
-        default:
-          debugWarning("Unknown parameter");
-          APDU_returnSW(SW_WRONG_P1P2);
-      }
-      APDU_return();
+        switch(P1) {
+          case P1_SIGNATURE_A:
+            debugMessage("P1_SIGNATURE_A");
+            APDU_checkLength(SIZE_N);
+            Copy(SIZE_N, credential->signature.A, public.apdu.data);
+            debugNumber("Initialised signature.A", credential->signature.A);
+            break;
 
-    case INS_ISSUE_SIGNATURE_PROOF:
-      debugMessage("INS_ISSUE_SIGNATURE_PROOF");
+          case P1_SIGNATURE_E:
+            debugMessage("P1_SIGNATURE_E");
+            APDU_checkLength(SIZE_E);
+            Copy(SIZE_E, credential->signature.e, public.apdu.data);
+            debugValue("Initialised signature.e", credential->signature.e, SIZE_E);
+            break;
 
-      switch(P1) {
-        case P1_PROOF_C:
-          debugMessage("P1_SIGNATURE_PROOF_C");
-          APDU_checkLength(SIZE_H);
-          Copy(SIZE_H, credential->proof.challenge, public.apdu.data);
-          debugHash("Initialised c", credential->proof.challenge);
-          break;
+          case P1_SIGNATURE_V:
+            debugMessage("P1_SIGNATURE_V");
+            APDU_checkLength(SIZE_V);
+            constructSignature(credential);
+            debugValue("Initialised signature.v", credential->signature.v, SIZE_V);
+            break;
 
-        case P1_PROOF_S_E:
-          debugMessage("P1_SIGNATURE_PROOF_S_E");
-          APDU_checkLength(SIZE_N);
-          Copy(SIZE_N, credential->proof.response, public.apdu.data);
-          debugNumber("Initialised s_e", credential->proof.response);
-          break;
+          case P1_SIGNATURE_VERIFY:
+            debugMessage("P1_SIGNATURE_VERIFY");
+            APDU_checkLength(0);
+            verifySignature(credential, &masterSecret[0], &session.vfySig);
+            debugMessage("Verified signature");
+            break;
 
-        case P1_PROOF_VERIFY:
-          debugMessage("P1_SIGNATURE_PROOF_VERIFY");
-          APDU_checkLength(0);
-          verifyProof(credential, &session.vfyPrf, &public.vfyPrf);
-          debugMessage("Verified proof");
-          break;
+          default:
+            debugWarning("Unknown parameter");
+            APDU_returnSW(SW_WRONG_P1P2);
+        }
+        APDU_return();
 
-        default:
-          debugWarning("Unknown parameter");
-          APDU_returnSW(SW_WRONG_P1P2);
-      }
-      APDU_return();
+      case INS_ISSUE_SIGNATURE_PROOF:
+        debugMessage("INS_ISSUE_SIGNATURE_PROOF");
 
-    default:
-      // TODO: unknown
-      APDU_returnSW(SW_INS_NOT_SUPPORTED);
+        switch(P1) {
+          case P1_PROOF_C:
+            debugMessage("P1_SIGNATURE_PROOF_C");
+            APDU_checkLength(SIZE_H);
+            Copy(SIZE_H, credential->proof.challenge, public.apdu.data);
+            debugHash("Initialised c", credential->proof.challenge);
+            break;
+
+          case P1_PROOF_S_E:
+            debugMessage("P1_SIGNATURE_PROOF_S_E");
+            APDU_checkLength(SIZE_N);
+            Copy(SIZE_N, credential->proof.response, public.apdu.data);
+            debugNumber("Initialised s_e", credential->proof.response);
+            break;
+
+          case P1_PROOF_VERIFY:
+            debugMessage("P1_SIGNATURE_PROOF_VERIFY");
+            APDU_checkLength(0);
+            verifyProof(credential, &session.vfyPrf, &public.vfyPrf);
+            debugMessage("Verified proof");
+            break;
+
+          default:
+            debugWarning("Unknown parameter");
+            APDU_returnSW(SW_WRONG_P1P2);
+        }
+        APDU_return();
+
+      default:
+        // TODO: unknown
+        APDU_returnSW(SW_INS_NOT_SUPPORTED);
+    }
   }
 }
 
@@ -572,119 +590,137 @@ void processVerification(void) {
     APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
   }
 
-  // A credential should be selected, except for issuance setup.
-  if (credential == NULL && INS != INS_PROVE_CREDENTIAL) {
-    APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
-  }
+  // Special case: start verification
+  if (INS == INS_PROVE_CREDENTIAL) {
+    debugMessage("INS_PROVE_CREDENTIAL");
+    APDU_checkLength(sizeof(VerificationSetup));
 
-  switch (INS) {
-    case INS_PROVE_CREDENTIAL:
-      debugMessage("INS_PROVE_CREDENTIAL");
-      APDU_checkLength(2 + SIZE_H + 2 + SIZE_TIMESTAMP);
+    // Start a new verification session
+    credential = NULL;
+    ClearBytes(sizeof(VerificationSession), &(session.prove));
 
-      // Cleanup session
-      ClearBytes(sizeof(VerificationSession), &(session.prove));
+    // Check policy
+    if (!auth_checkSelection(&policy, public.verificationSetup.id, public.verificationSetup.selection)) {
+      APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
+    }
 
-      // FIXME: should be done during auth.
-      Copy(SIZE_TERMINAL_ID, terminal, public.verificationSetup.terminal);
-
-      // Lookup the given credential ID and select it if it exists
-      for (i = 0; i < MAX_CRED; i++) {
-        if (credentials[i].id == public.verificationSetup.id) {
-          credential = &credentials[i];
-
-          if (verifySelection(credential, public.verificationSetup.selection) < 0) {
-            credential = NULL;
-            APDU_returnSW(SW_WRONG_DATA);
-          } else {
-            session.prove.disclose = public.verificationSetup.selection;
-          }
-
-          if (CHV_required && !CHV_verified(credPIN)) {
-            credential = NULL;
-            APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
-          }
-
-          Copy(SIZE_H, public.prove.context, public.verificationSetup.context);
-          debugHash("Initialised context", public.prove.context);
-
-          // Create new log entry
-          logEntry = (IRMALogEntry*) log_new_entry(&log);
-          Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.verificationSetup.timestamp);
-          Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
-          logEntry->action = ACTION_PROVE;
-          logEntry->credential = credential->id;
-          logEntry->details.prove.selection = session.prove.disclose;
-
-          APDU_return();
-        }
+    // Lookup the credential slot
+    for (i = 0; i < MAX_CRED; i++) {
+      if (credentials[i].id == public.verificationSetup.id) {
+        credential = &credentials[i];
       }
+    }
+
+    // No credential slot selected,
+    if (credential == NULL) {
+      debugWarning("Credential not found");
       APDU_returnSW(SW_REFERENCED_DATA_NOT_FOUND);
+    }
 
-    case INS_PROVE_COMMITMENT:
-      debugMessage("INS_PROVE_COMMITMENT");
-      APDU_checkLength(SIZE_STATZK);
-      constructProof(credential, &masterSecret[0]);
-      debugHash("Returned c", public.apdu.data);
-      APDU_returnLa(SIZE_H);
+    // Check selection validity
+    if (verifySelection(credential, public.verificationSetup.selection) < 0) {
+      credential = NULL;
+      APDU_returnSW(SW_WRONG_DATA);
+    }
 
-    case INS_PROVE_SIGNATURE:
-      debugMessage("INS_PROVE_SIGNATURE");
+    // Check PIN protection
+    if (verifyProtection(credential, public.verificationSetup.selection) && !CHV_verified(credPIN)) {
+      credential = NULL;
+      APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+    }
 
-      switch(P1) {
-        case P1_SIGNATURE_A:
-          debugMessage("P1_SIGNATURE_A");
-          if (!(APDU_wrapped || CheckCase(1))) {
-            SM_ReturnSW(SW_WRONG_LENGTH);
-          }
+    // Initialise the session
+    session.prove.disclose = public.verificationSetup.selection;
+    Copy(SIZE_H, public.prove.context, public.verificationSetup.context);
+    debugHash("Initialised context", public.prove.context);
 
-          Copy(SIZE_N, public.apdu.data, public.prove.APrime);
-          debugNumber("Returned A'", public.apdu.data);
-          SM_ReturnLa(SW_NO_ERROR, SIZE_N);
+    // Create new log entry
+    logEntry = (IRMALogEntry*) log_new_entry(&log);
+    Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.verificationSetup.timestamp);
+    Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+    logEntry->action = ACTION_PROVE;
+    logEntry->credential = credential->id;
+    logEntry->details.prove.selection = session.prove.disclose;
 
-        case P1_SIGNATURE_E:
-          debugMessage("P1_SIGNATURE_E");
-          if (!(APDU_wrapped || CheckCase(1))) {
-            SM_ReturnSW(SW_WRONG_LENGTH);
-          }
+    APDU_return();
 
-          Copy(SIZE_E_, public.apdu.data, public.prove.eHat);
-          debugValue("Returned e^", public.apdu.data, SIZE_E_);
-          SM_ReturnLa(SW_NO_ERROR, SIZE_E_);
+  // All other verification commands
+  } else {
 
-        case P1_SIGNATURE_V:
-          debugMessage("P1_SIGNATURE_V");
-          if (!(APDU_wrapped || CheckCase(1))) {
-            SM_ReturnSW(SW_WRONG_LENGTH);
-          }
+    // A credential should be selected, except for issuance setup.
+    if (credential == NULL) {
+      APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
+    }
 
-          Copy(SIZE_V_, public.apdu.data, public.prove.vHat);
-          debugValue("Returned v^", public.apdu.data, SIZE_V_);
-          SM_ReturnLa(SW_NO_ERROR, SIZE_V_);
+    switch (INS) {
+      case INS_PROVE_COMMITMENT:
+        debugMessage("INS_PROVE_COMMITMENT");
+        APDU_checkLength(SIZE_STATZK);
+        constructProof(credential, &masterSecret[0]);
+        debugHash("Returned c", public.apdu.data);
+        APDU_returnLa(SIZE_H);
 
-        default:
-          debugWarning("Unknown parameter");
-          SM_ReturnSW(SW_WRONG_P1P2);
-      }
+      case INS_PROVE_SIGNATURE:
+        debugMessage("INS_PROVE_SIGNATURE");
 
-    case INS_PROVE_ATTRIBUTE:
-      debugMessage("INS_PROVE_ATTRIBUTE");
-      if (!(APDU_wrapped || CheckCase(1))) {
-        APDU_returnSW(SW_WRONG_LENGTH);
-      }
-      if (P1 > credential->size) {
-        APDU_returnSW(SW_WRONG_P1P2);
-      }
+        switch(P1) {
+          case P1_SIGNATURE_A:
+            debugMessage("P1_SIGNATURE_A");
+            if (!(APDU_wrapped || CheckCase(1))) {
+              APDU_returnSW(SW_WRONG_LENGTH);
+            }
 
-      if (disclosed(P1)) {
-        Copy(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
-        debugValue("Returned attribute", public.apdu.data, SIZE_M);
-        APDU_returnLa(SIZE_M);
-      } else {
-        Copy(SIZE_M_, public.apdu.data, session.prove.mHat[P1]);
-        debugValue("Returned response", public.apdu.data, SIZE_M_);
-        APDU_returnLa(SIZE_M_);
-      }
+            Copy(SIZE_N, public.apdu.data, public.prove.APrime);
+            debugNumber("Returned A'", public.apdu.data);
+            APDU_returnLa(SIZE_N);
+
+          case P1_SIGNATURE_E:
+            debugMessage("P1_SIGNATURE_E");
+            if (!(APDU_wrapped || CheckCase(1))) {
+              APDU_returnSW(SW_WRONG_LENGTH);
+            }
+
+            Copy(SIZE_E_, public.apdu.data, public.prove.eHat);
+            debugValue("Returned e^", public.apdu.data, SIZE_E_);
+            APDU_returnLa(SIZE_E_);
+
+          case P1_SIGNATURE_V:
+            debugMessage("P1_SIGNATURE_V");
+            if (!(APDU_wrapped || CheckCase(1))) {
+              APDU_returnSW(SW_WRONG_LENGTH);
+            }
+
+            Copy(SIZE_V_, public.apdu.data, public.prove.vHat);
+            debugValue("Returned v^", public.apdu.data, SIZE_V_);
+            APDU_returnLa(SIZE_V_);
+
+          default:
+            debugWarning("Unknown parameter");
+            APDU_returnSW(SW_WRONG_P1P2);
+        }
+
+      case INS_PROVE_ATTRIBUTE:
+        debugMessage("INS_PROVE_ATTRIBUTE");
+        if (!(APDU_wrapped || CheckCase(1))) {
+          APDU_returnSW(SW_WRONG_LENGTH);
+        }
+        if (P1 > credential->size) {
+          APDU_returnSW(SW_WRONG_P1P2);
+        }
+
+        if (disclosed(P1)) {
+          Copy(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
+          debugValue("Returned attribute", public.apdu.data, SIZE_M);
+          APDU_returnLa(SIZE_M);
+        } else {
+          Copy(SIZE_M_, public.apdu.data, session.prove.mHat[P1]);
+          debugValue("Returned response", public.apdu.data, SIZE_M_);
+          APDU_returnLa(SIZE_M_);
+        }
+      default:
+        // TODO: unknown
+        APDU_returnSW(SW_INS_NOT_SUPPORTED);
+    }
   }
 }
 

@@ -25,11 +25,6 @@
 
 #include "MULTOS.h"
 
-typedef struct {
-  unsigned int SW;
-  unsigned int La;
-} APDU_SWLa;
-
 /*
  * CLAss bytes
  */
@@ -142,8 +137,17 @@ typedef struct {
 #define APDU_checkP1(value) \
   if (P1 != value) { APDU_returnSW(SW_WRONG_P1P2); }
 
+#define APDU_checkP1range(lower, upper) \
+  if (P1 < lower || P1 > upper) { APDU_returnSW(SW_WRONG_P1P2); }
+
 #define APDU_checkP2(value) \
   if (P2 != value) { APDU_returnSW(SW_WRONG_P1P2); }
+
+#define APDU_checkP2upper(upper) \
+  if (P2 > upper) { APDU_returnSW(SW_WRONG_P1P2); }
+
+#define APDU_checkP2range(lower, upper) \
+  if (P2 < lower || P2 > upper) { APDU_returnSW(SW_WRONG_P1P2); }
 
 #define APDU_checkP1P2(value) \
   if (P1P2 != value) { APDU_returnSW(SW_WRONG_P1P2); }
