@@ -56,14 +56,12 @@ PublicData public;
 #pragma melsession
 
 // Idemix: protocol session variables
-SessionData session; // 389
-Credential *credential; // + 2 = 669
-Byte flags; // + 1 = 670
+SessionData session;
+Credential *credential;
 
 // Secure messaging: session parameters
 SM_parameters tunnel;
-Policy policy;
-Byte terminal[SIZE_TERMINAL_ID];
+Terminal terminal;
 
 /********************************************************************/
 /* Static segment (application EEPROM memory) variable declarations */
@@ -353,7 +351,7 @@ void processIssuance(void) {
     credential = NULL;
 
     // Check policy
-    if (!auth_checkIssuance(&policy, public.issuanceSetup.id)) {
+    if (!auth_checkIssuance(&terminal, public.issuanceSetup.id)) {
       APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
     }
 
@@ -362,7 +360,7 @@ void processIssuance(void) {
       // Reuse the existing credential slot.
       if (credentials[i].id == public.issuanceSetup.id) {
         debugMessage("Credential already exists");
-        if (!auth_checkOverwrite(&policy, public.issuanceSetup.id)) {
+        if (!auth_checkOverwrite(&terminal, public.issuanceSetup.id)) {
           debugWarning("Overwrite not allowed");
           APDU_returnSW(SW_COMMAND_NOT_ALLOWED_AGAIN);
         } else {
@@ -393,7 +391,7 @@ void processIssuance(void) {
     // Create new log entry
     logEntry = (IRMALogEntry*) log_new_entry(&log);
     Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.issuanceSetup.timestamp);
-    Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+    Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
     logEntry->action = ACTION_ISSUE;
     logEntry->credential = credential->id;
 
@@ -600,7 +598,7 @@ void processVerification(void) {
     ClearBytes(sizeof(VerificationSession), &(session.prove));
 
     // Check policy
-    if (!auth_checkSelection(&policy, public.verificationSetup.id, public.verificationSetup.selection)) {
+    if (!auth_checkSelection(&terminal, public.verificationSetup.id, public.verificationSetup.selection)) {
       APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
     }
 
@@ -637,7 +635,7 @@ void processVerification(void) {
     // Create new log entry
     logEntry = (IRMALogEntry*) log_new_entry(&log);
     Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.verificationSetup.timestamp);
-    Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+    Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
     logEntry->action = ACTION_PROVE;
     logEntry->credential = credential->id;
     logEntry->details.prove.selection = session.prove.disclose;
@@ -800,7 +798,7 @@ void processAdministration(void) {
         // Create new log entry
         logEntry = (IRMALogEntry*) log_new_entry(&log);
         Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.apdu.data);
-        Copy(SIZE_TERMINAL_ID, logEntry->terminal, terminal);
+        Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
         logEntry->action = ACTION_REMOVE;
         logEntry->credential = P1P2;
 

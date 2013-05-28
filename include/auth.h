@@ -25,18 +25,18 @@
 
 #include "RSA.h"
 
-#define POLICY_MAX_SIZE 8
+#define AUTH_POLICY_MAX_COUNT 8
+#define AUTH_TERMINAL_ID_BYTES 4
+
 typedef struct {
   unsigned int id;
   unsigned int mask;
-} PolEntry;
+} Rule;
 
 typedef struct{
-  PolEntry list[POLICY_MAX_SIZE];
-  unsigned char size;
-} Policy;
-
-
+  Rule list[AUTH_POLICY_MAX_COUNT];
+  unsigned char id[AUTH_TERMINAL_ID_BYTES];
+} Terminal;
 
 #define AUTH_CHALLENGE_BYTES 32
 
@@ -59,7 +59,7 @@ void authentication_authenticateTerminal(unsigned char *response, unsigned char 
 #define AUTH_POLICY_MASK_OVERWRITE (AUTH_POLICY_MASK_ISSUANCE | 0x0002)
 #define AUTH_POLICY_MASK_SELECTION 0xFFFE
 
-int auth_checkPolicy(const Policy *policy, unsigned int id, unsigned int mask);
+int auth_checkPolicy(const Terminal *policy, unsigned int id, unsigned int mask);
 
 #define auth_checkIssuance(policy, id) \
   auth_checkPolicy(policy, id, AUTH_POLICY_MASK_ISSUANCE)

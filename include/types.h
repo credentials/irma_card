@@ -98,7 +98,7 @@ typedef struct {
 
 typedef struct {
   Byte timestamp[SIZE_TIMESTAMP];
-  Byte terminal[SIZE_TERMINAL_ID];
+  Byte terminal[AUTH_TERMINAL_ID_BYTES];
   Byte action;
   CredentialIdentifier credential;
   union {
@@ -120,9 +120,9 @@ typedef struct {
 
 typedef struct {
   CredentialIdentifier id;
-  Hash context;
   Size size;
   CredentialFlags flags;
+  Hash context;
   Byte timestamp[SIZE_TIMESTAMP];
 } IssuanceSetup;
 
@@ -162,10 +162,9 @@ typedef struct {
 
 typedef struct {
   CredentialIdentifier id;
-  Hash context;
   AttributeMask selection;
+  Hash context;
   Byte timestamp[SIZE_TIMESTAMP];
-  Byte terminal[SIZE_TERMINAL_ID];
 } VerificationSetup;
 
 typedef struct {

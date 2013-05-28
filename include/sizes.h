@@ -25,7 +25,7 @@
 
 // Attribute and credential definitions
 #define MAX_ATTR      5
-#define MAX_CRED      10
+#define MAX_CRED      15
 
 // System parameter lengths
 #define LENGTH_N      1024
@@ -72,7 +72,6 @@
 #define SIZE_CRED_PIN 4
 #define SIZE_CARD_PIN 6
 
-#define SIZE_TERMINAL_ID 4
 #define SIZE_TIMESTAMP 4
 #define SIZE_FLAGS 2
 

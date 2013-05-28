@@ -74,10 +74,10 @@ void authentication_generateChallenge(RSA_public_key *key, unsigned char *nonce,
 }
 
 
-int auth_checkPolicy(const Policy *policy, unsigned int id, unsigned int mask) {
+int auth_checkPolicy(const Terminal *policy, unsigned int id, unsigned int mask) {
   unsigned char i;
 
-  for (i = 0; i < policy->size; i++) {
+  for (i = 0; i < AUTH_POLICY_MAX_COUNT; i++) {
     if (policy->list[i].id == id && (policy->list[i].mask & mask) == mask) {
       return AUTH_POLICY_ALLOWED;
     }
