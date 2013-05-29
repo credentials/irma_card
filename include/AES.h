@@ -23,7 +23,7 @@
 #ifndef __AES_H
 #define __AES_H
 
-#include "MULTOS.h"
+#include "AES.config.h"
 
 #ifndef AES_KEY_BITS
   #error "AES_KEY_BITS not defined"
@@ -43,54 +43,48 @@
 #define AES_BLOCK_BYTES AES_BITS_TO_BYTES(AES_BLOCK_BITS)
 #define AES_IV_BYTES AES_BITS_TO_BYTES(AES_IV_BITS)
 
-#define AES_CBC_sign(message_bytes, iv, key, signature, message) \
-do { \
-  __push((unsigned int)(message_bytes)); \
-  __push((void *)(iv)); \
-  __push((void *)(key)); \
-  __push((void *)(signature)); \
-  __push((void *)(message)); \
-  __code(PRIM, PRIM_GENERATE_TRIPLE_DES_CBC_SIGNATURE); \
-} while (0)
+#include "MULTOS.h"
 
-#define AES_CBC_decrypt(cipher_bytes, cipher, plain, iv, key) \
+void AES_CBC_sign(unsigned int message_bytes, const unsigned char *message, unsigned char *signature, unsigned int key_bytes, const unsigned char *key, const unsigned char *iv);
+
+#define AES_CBC_decrypt(cipher_bytes, cipher, plain, key_bytes, key, iv) \
 do { \
   __push(AES_IV_BYTES); \
   __push((void *)(iv)); \
-  AES_decrypt(cipher_bytes, cipher, plain, iv, key, BLOCK_CIPHER_MODE_CBC); \
+  AES_decrypt(cipher_bytes, cipher, plain, key_bytes, key, BLOCK_CIPHER_MODE_CBC); \
 } while (0)
 
-#define AES_ECB_decrypt(cipher_bytes, cipher, plain, key) \
+#define AES_ECB_decrypt(cipher_bytes, cipher, plain, key_bytes, key) \
 do { \
-  AES_decrypt(cipher_bytes, cipher, plain, key, BLOCK_CIPHER_MODE_ECB); \
+  AES_decrypt(cipher_bytes, cipher, plain, key_bytes, key, BLOCK_CIPHER_MODE_ECB); \
 } while (0)
 
-#define AES_decrypt(cipher_bytes, cipher, plain, key, mode) \
+#define AES_decrypt(cipher_bytes, cipher, plain, key_bytes, key, mode) \
   __push((unsigned int)(cipher_bytes)); \
   __push((void *)(key)); \
-  __push(AES_KEY_BYTES); \
+  __push((unsigned int)(key_bytes)); \
   __push((void *)(plain)); \
   __push((void *)(cipher)); \
   __code(PRIM, PRIM_BLOCK_DECIPHER, BLOCK_CIPHER_ALGORITHM_AES, mode);
 
-#define AES_CBC_encrypt(plain_bytes, plain, cipher, iv, key) \
+#define AES_CBC_encrypt(plain_bytes, plain, cipher, key_bytes, key, iv) \
 do { \
   __push(AES_IV_BYTES); \
   __push((void *)(iv)); \
-  AES_decrypt(plain_bytes, plain, cipher, iv, key, BLOCK_CIPHER_MODE_CBC); \
+  AES_encrypt(plain_bytes, plain, cipher, key_bytes, key, BLOCK_CIPHER_MODE_CBC); \
 } while (0)
 
-#define AES_ECB_encrypt(plain_bytes, plain, cipher, key) \
+#define AES_ECB_encrypt(plain_bytes, plain, cipher, key_bytes, key) \
 do { \
-  AES_decrypt(cipher_bytes, cipher, plain, key, BLOCK_CIPHER_MODE_ECB); \
+  AES_encrypt(cipher_bytes, cipher, plain, key_bytes, key, BLOCK_CIPHER_MODE_ECB); \
 } while (0)
 
-#define AES_encrypt(plain_bytes, plain, cipher, key, mode) \
+#define AES_encrypt(plain_bytes, plain, cipher, key_bytes, key, mode) \
   __push((unsigned int)(plain_bytes)); \
   __push((void *)(key)); \
-  __push(AES_KEY_BYTES); \
+  __push((unsigned int)(key_bytes)); \
   __push((void *)(plain)); \
   __push((void *)(cipher)); \
-  __code(PRIM, PRIM_BLOCK_ENCIPHER, BLOCK_CIPHER_ALGORITHM_AES, BLOCK_CIPHER_MODE_CBC);
+  __code(PRIM, PRIM_BLOCK_ENCIPHER, BLOCK_CIPHER_ALGORITHM_AES, mode);
 
 #endif // __AES_H

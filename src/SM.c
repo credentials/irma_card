@@ -105,7 +105,7 @@ int SM_APDU_unwrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *pa
   i = SM_ISO7816_4_pad(buffer, i);
 
   // Verify the MAC
-  SM_CBC_sign(i, SM_IV, params->key_mac, mac, buffer);
+  SM_CBC_sign(i, buffer, mac, SM_KEY_BYTES, params->key_mac, SM_IV);
   if (NotEqual(SM_MAC_BYTES, mac, apdu + offset + 2)) {
     return SM_ERROR_MAC_INVALID;
   }
@@ -163,7 +163,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *par
 
   // calculate and write mac
   Copy(SM_SSC_BYTES, buffer - SM_SSC_BYTES, params->ssc);
-  SM_CBC_sign(i + SM_SSC_BYTES, SM_IV, params->key_mac, apdu + offset + 2, buffer - SM_SSC_BYTES);
+  SM_CBC_sign(i + SM_SSC_BYTES, buffer - SM_SSC_BYTES, apdu + offset + 2, SM_KEY_BYTES, params->key_mac, SM_IV);
 
   // write do8e
   buffer[offset++] = 0x8e;
@@ -183,7 +183,7 @@ void SM_APDU_wrap(unsigned char *apdu, unsigned char *buffer, SM_parameters *par
  */
 unsigned int SM_ISO7816_4_pad(unsigned char *data, unsigned int length) {
   data[length++] = 0x80;
-  while (length % 8 != 0) {
+  while (length % SM_BLOCK_BYTES != 0) {
     data[length++] = 0x00;
   }
   return length;

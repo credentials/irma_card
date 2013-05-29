@@ -32,8 +32,8 @@
  * Define either SM_AES or SM_DES to use defaults, otherwise specify the
  * custom configuration in the first block
  */
-//#define SM_AES
-#define SM_DES
+#define SM_AES
+//#define SM_DES
 
 #ifndef SM_AES
 #ifndef SM_DES
@@ -47,6 +47,7 @@
 
 #define SM_KEY_BITS
 #define SM_IV_BITS
+#define SM_BLOCK_BITS
 #define SM_MAC_BITS
 
 #else // !SM_DES
@@ -59,6 +60,7 @@
 
 #define SM_KEY_BITS DES_2KEY_BITS
 #define SM_IV_BITS DES_IV_BITS
+#define SM_BLOCK_BITS DES_BLOCK_BITS
 #define SM_MAC_BITS DES_BLOCK_BITS
 
 #endif // !SM_DES
@@ -72,6 +74,7 @@
 
 #define SM_KEY_BITS AES_KEY_BITS
 #define SM_IV_BITS AES_IV_BITS
+#define SM_BLOCK_BITS AES_BLOCK_BITS
 #define SM_MAC_BITS AES_BLOCK_BITS
 
 #endif // !SM_AES

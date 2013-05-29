@@ -47,6 +47,10 @@
   #error "SM_IV_BITS not defined"
 #endif // !SM_IV_BITS
 
+#ifndef SM_BLOCK_BITS
+  #error "SM_BLOCK_BITS not defined"
+#endif // !SM_BLOCK_BITS
+
 #ifndef SM_MAC_BITS
   #error "SM_MAC_BITS not defined"
 #endif // !SM_MAC_BITS
@@ -63,6 +67,7 @@
 
 #define SM_IV_BYTES SM_BITS_TO_BYTES(SM_IV_BITS)
 #define SM_KEY_BYTES SM_BITS_TO_BYTES(SM_KEY_BITS)
+#define SM_BLOCK_BYTES SM_BITS_TO_BYTES(SM_BLOCK_BITS)
 #define SM_MAC_BYTES SM_BITS_TO_BYTES(SM_MAC_BITS)
 #define SM_SHA_BYTES SM_BITS_TO_BYTES(SM_SHA_BITS)
 #define SM_SSC_BYTES SM_BITS_TO_BYTES(SM_SSC_BITS)

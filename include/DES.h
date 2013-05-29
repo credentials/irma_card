@@ -37,7 +37,7 @@
 #define DES_BLOCK_BYTES DES_BITS_TO_BYTES(DES_BLOCK_BITS)
 #define DES_IV_BYTES DES_BITS_TO_BYTES(DES_IV_BITS)
 
-#define DES_CBC_sign(message_bytes, iv, key, signature, message) \
+#define DES_CBC_sign(message_bytes, message, signature, key_bytes, key, iv) \
 do { \
   __push((unsigned int)(message_bytes)); \
   __push((void *)(iv)); \
@@ -47,7 +47,7 @@ do { \
   __code(PRIM, PRIM_GENERATE_TRIPLE_DES_CBC_SIGNATURE); \
 } while (0)
 
-#define DES_CBC_decrypt(cipher_bytes, cipher, plain, iv, key_bytes, key) \
+#define DES_CBC_decrypt(cipher_bytes, cipher, plain, key_bytes, key, iv) \
 do { \
   __push(DES_IV_BYTES); \
   __push((void *)(iv)); \
@@ -67,7 +67,7 @@ do { \
   __push((void *)(cipher)); \
   __code(PRIM, PRIM_BLOCK_DECIPHER, BLOCK_CIPHER_ALGORITHM_DES, mode);
 
-#define DES_CBC_encrypt(plain_bytes, plain, cipher, iv, key_bytes, key) \
+#define DES_CBC_encrypt(plain_bytes, plain, cipher, key_bytes, key, iv) \
 do { \
   __push(DES_IV_BYTES); \
   __push((void *)(iv)); \
