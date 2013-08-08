@@ -82,12 +82,35 @@ do { \
   #define ModExp ModExpSecure
 #endif // !ModExp
 
-#define CarryFlag(flag) \
+extern MATH_flag;
+
+#define IfCarry(action) \
 do { \
   __code(PRIM, PRIM_LOAD_CCR); \
   __code(PRIM, PRIM_BIT_MANIPULATE_BYTE, (1<<7 | 3), (1<<3)); \
   __code(PRIM, PRIM_SHIFT_RIGHT, 1, 3); \
-  __code(STORE, &flag, 1); \
+  __code(STORE, &MATH_flag, 1); \
+  if (MATH_flag) { action; } \
+} while (0)
+
+#define IfZero(bytes, value, action) \
+do { \
+  __code(TESTN, value, bytes); \
+  __code(PRIM, PRIM_LOAD_CCR); \
+  __code(PRIM, PRIM_BIT_MANIPULATE_BYTE, (1<<7 | 3), 1); \
+  __code(STORE, &MATH_flag, 1); \
+  if (MATH_flag) { action; } \
+} while (0)
+
+#define IfZeroBytes(bytes, value, action) \
+do { \
+  __push(BLOCKCAST(bytes)(value)); \
+  __code(TESTN, bytes); \
+  __code(PRIM, PRIM_LOAD_CCR); \
+  __code(PRIM, PRIM_BIT_MANIPULATE_BYTE, (1<<7 | 3), 1); \
+  __code(STORE, &MATH_flag, 1); \
+  __code(POPN, bytes); \
+  if (MATH_flag) { action; } \
 } while (0)
 
 #endif // __MATH_H
