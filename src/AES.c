@@ -30,3 +30,12 @@ void AES_CBC_sign(unsigned int message_bytes, const unsigned char *message, unsi
     AES_CBC_encrypt(AES_BLOCK_BYTES, message + i*AES_BLOCK_BYTES, signature, key_bytes, key, signature);
   }
 }
+
+void AES_CMAC_sign(unsigned int message_bytes, const unsigned char *message, unsigned char *signature, unsigned int key_bytes, const unsigned char *key, const unsigned char *iv) {
+  unsigned char i;
+
+  AES_CBC_encrypt(AES_BLOCK_BYTES, message, signature, key_bytes, key, iv);
+  for (i = 1; i < message_bytes / AES_BLOCK_BYTES; i++) {
+    AES_CBC_encrypt(AES_BLOCK_BYTES, message + i*AES_BLOCK_BYTES, signature, key_bytes, key, signature);
+  }
+}
