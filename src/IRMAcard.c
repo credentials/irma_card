@@ -347,6 +347,13 @@ void processIssuance(void) {
     debugMessage("INS_ISSUE_CREDENTIAL");
     APDU_checkLength(sizeof(IssuanceSetup));
 
+    // Ensure that the master secret is initiaised
+    TestZero(SIZE_M, masterSecret, flag);
+    if (flag != 0) {
+      // Generate a random value to initialise the master secret
+      RandomBits(masterSecret, LENGTH_M);
+    }
+
     // Start a new issuance session
     credential = NULL;
 
