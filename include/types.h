@@ -35,16 +35,15 @@ typedef unsigned int uint;
 typedef uint Size;
 typedef const char *String;
 
-typedef unsigned char Byte;
-typedef Byte *ByteArray;
+typedef unsigned char *ByteArray;
 
-typedef Byte Hash[SIZE_H];
-typedef Byte Nonce[SIZE_STATZK];
-typedef Byte ResponseE[SIZE_E_];
-typedef Byte ResponseM[SIZE_M_];
-typedef Byte ResponseV[SIZE_V_];
-typedef Byte ResponseVPRIME[SIZE_VPRIME_];
-typedef Byte Number[SIZE_N];
+typedef unsigned char Hash[SIZE_H];
+typedef unsigned char Nonce[SIZE_STATZK];
+typedef unsigned char ResponseE[SIZE_E_];
+typedef unsigned char ResponseM[SIZE_M_];
+typedef unsigned char ResponseV[SIZE_V_];
+typedef unsigned char ResponseVPRIME[SIZE_VPRIME_];
+typedef unsigned char Number[SIZE_N];
 typedef Number Numbers[];
 
 typedef struct {
@@ -61,13 +60,13 @@ typedef struct {
   Number R[SIZE_L];
 } CLPublicKey;
 
-typedef Byte CLMessage[SIZE_M];
+typedef unsigned char CLMessage[SIZE_M];
 typedef CLMessage CLMessages[MAX_ATTR];
 
 typedef struct {
   Number A;
-  Byte e[SIZE_E];
-  Byte v[SIZE_V];
+  unsigned char e[SIZE_E];
+  unsigned char v[SIZE_V];
 } CLSignature;
 
 typedef struct {
@@ -82,7 +81,7 @@ typedef uint CredentialIdentifier;
 
 typedef struct {
   AttributeMask protect;
-  Byte RFU;
+  unsigned char RFU;
 } CredentialFlags;
 
 typedef struct {
@@ -90,22 +89,22 @@ typedef struct {
   CLSignature signature;
   CLMessages attribute;
   CLProof proof;
-  Byte size;
+  unsigned char size;
   CredentialFlags issuerFlags;
   CredentialFlags userFlags;
   CredentialIdentifier id;
 } Credential;
 
 typedef struct {
-  Byte timestamp[SIZE_TIMESTAMP];
-  Byte terminal[AUTH_TERMINAL_ID_BYTES];
-  Byte action;
+  unsigned char timestamp[SIZE_TIMESTAMP];
+  unsigned char terminal[AUTH_TERMINAL_ID_BYTES];
+  unsigned char action;
   CredentialIdentifier credential;
   union {
     struct {
       AttributeMask selection;
     } prove;
-    Byte data[5];
+    unsigned char data[5];
   } details;
 } IRMALogEntry;
 
@@ -114,8 +113,8 @@ typedef struct {
 #define ACTION_REMOVE 0x03;
 
 typedef struct {
-  Byte data[255]; // 255
-  Byte session[SIZE_PUBLIC - 255]; // SIZE_PUBLIC - 255
+  unsigned char data[255]; // 255
+  unsigned char session[SIZE_PUBLIC - 255]; // SIZE_PUBLIC - 255
 } APDU; // SIZE_PUBLIC
 
 typedef struct {
@@ -123,13 +122,13 @@ typedef struct {
   Size size;
   CredentialFlags flags;
   Hash context;
-  Byte timestamp[SIZE_TIMESTAMP];
+  unsigned char timestamp[SIZE_TIMESTAMP];
 } IssuanceSetup;
 
 typedef struct {
   Number U; // 128
   union {
-    Byte data[SIZE_BUFFER_C1]; // 307
+    unsigned char data[SIZE_BUFFER_C1]; // 307
     Number number[3]; // 384
   } buffer; // 384
   Value list[5]; // 20
@@ -138,8 +137,8 @@ typedef struct {
 
 typedef struct {
   Hash challenge; // 32
-  Byte sHat[SIZE_S_]; // 75
-  Byte vPrime[SIZE_VPRIME]; // 138
+  unsigned char sHat[SIZE_S_]; // 75
+  unsigned char vPrime[SIZE_VPRIME]; // 138
   ResponseVPRIME vPrimeHat; // 180
 } IssuanceSession; // 32 + 75 + 138 + 180 = 425
 
@@ -150,7 +149,7 @@ typedef struct {
 } CLSignatureVerification; // 384
 
 typedef struct {
-  Byte buffer[SIZE_BUFFER_C2]; // 438
+  unsigned char buffer[SIZE_BUFFER_C2]; // 438
 } IssuanceProofVerification; // 438
 
 typedef struct {
@@ -164,7 +163,7 @@ typedef struct {
   CredentialIdentifier id;
   AttributeMask selection;
   Hash context;
-  Byte timestamp[SIZE_TIMESTAMP];
+  unsigned char timestamp[SIZE_TIMESTAMP];
 } VerificationSetup;
 
 typedef struct {
@@ -173,12 +172,12 @@ typedef struct {
     Hash challenge; // 20
   } apdu; // 20
   union {
-    Byte data[SIZE_BUFFER_C1]; // 319
+    unsigned char data[SIZE_BUFFER_C1]; // 319
     Number number[2]; // 256
   } buffer; // 319
   Hash context; // 20
   Value list[4]; // 16
-  Byte rA[SIZE_R_A]; // 138
+  unsigned char rA[SIZE_R_A]; // 138
   Number APrime; // 128
   ResponseV vHat; // 231
   ResponseE eHat; // 45
@@ -192,7 +191,7 @@ typedef struct {
 typedef struct {
   ByteArray certBody;
   RSA_public_key terminalKey;
-  Byte challenge[AUTH_CHALLENGE_BYTES];
+  unsigned char challenge[AUTH_CHALLENGE_BYTES];
 } TerminalAuthentication;
 
 typedef struct {
@@ -201,13 +200,13 @@ typedef struct {
 } AdminFlags;
 
 typedef struct {
-  Byte apdu[255];
-  Byte cert[768];
+  unsigned char apdu[255];
+  unsigned char cert[768];
   unsigned int offset;
 } CertificateVerification;
 
 typedef union {
-  Byte base[1];
+  unsigned char base[1];
 
   APDU apdu;
 
@@ -223,7 +222,7 @@ typedef union {
 } PublicData;
 
 typedef union {
-  Byte base[1];
+  unsigned char base[1];
 
   TerminalAuthentication auth;
   IssuanceSession issue;

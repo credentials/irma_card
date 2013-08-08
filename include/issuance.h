@@ -51,6 +51,18 @@ int verifyProof(Credential *credential, IssuanceProofSession *session, IssuanceP
 #define ISSUANCE_ERROR_PROOF_INVALID -1
 #define ISSUANCE_PROOF_VALID 1
 
+int issuance_checkPublicKey(Credential *credential);
+#define ISSUANCE_PUBLIC_KEY_INCOMPLETE -1
+#define ISSUANCE_PUBLIC_KEY_COMPLETE 1
+
+int issuance_checkAttributes(Credential *credential);
+#define ISSUANCE_ATTRIBUTES_INCOMPLETE -1
+#define ISSUANCE_ATTRIBUTES_COMPLETE 1
+
+int issuance_checkSignature(Credential *credential);
+#define ISSUANCE_SIGNATURE_INCOMPLETE -1
+#define ISSUANCE_SIGNATURE_COMPLETE 1
+
 /**
  * Compute the response value vPrimeHat = vPrimeTilde + c*vPrime
  * 

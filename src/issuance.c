@@ -138,11 +138,10 @@ void constructSignature(Credential *credential) {
   __code(POPN, 1 + SIZE_V/2);
   __code(STOREI, 1 + SIZE_V/2);
 
-  CarryFlag(flag);
-  if (flag != 0x00) {
+  IfCarry(
     debugMessage("Addition with carry, adding 1");
     __code(INCN, public.apdu.data, SIZE_V/2);
-  }
+  );
 
   // First push some zero's to compensate for the size difference
   __push(credential->signature.v);
@@ -166,7 +165,7 @@ void constructSignature(Credential *credential) {
  * @param masterSecret
  */
 int verifySignature(Credential *credential, unsigned char *masterSecret, CLSignatureVerification *session) {
-  Byte i;
+  unsigned char i;
 
   // Clear the memory before starting computations
   ClearBytes(sizeof(CLSignatureVerification), session);
@@ -252,4 +251,40 @@ int verifyProof(Credential *credential, IssuanceProofSession *session, IssuanceP
   } else {
     return ISSUANCE_PROOF_VALID;
   }
+}
+
+int issuance_checkPublicKey(Credential *credential) {
+  unsigned char i;
+
+  IfZeroBytes(SIZE_N, credential->issuerKey.n, return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
+  IfZeroBytes(SIZE_N, credential->issuerKey.S, return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
+  IfZeroBytes(SIZE_N, credential->issuerKey.Z, return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
+  for (i = 0; i < credential->size + 1; i++) {
+    IfZeroBytes(SIZE_N, credential->issuerKey.R[i], return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
+  }
+
+  return ISSUANCE_PUBLIC_KEY_COMPLETE;
+}
+
+int issuance_checkAttributes(Credential *credential) {
+  unsigned char i;
+
+  for (i = 0; i < credential->size; i++) {
+    IfZeroBytes(SIZE_N, credential->attribute[i], return ISSUANCE_ATTRIBUTES_INCOMPLETE);
+  }
+
+  return ISSUANCE_ATTRIBUTES_COMPLETE;
+}
+
+int issuance_checkSignature(Credential *credential) {
+  IfZeroBytes(SIZE_N, credential->signature.A, return ISSUANCE_SIGNATURE_INCOMPLETE);
+  IfZeroBytes(SIZE_E, credential->signature.e, return ISSUANCE_SIGNATURE_INCOMPLETE);
+  IfZeroBytes(SIZE_V, credential->signature.v, return ISSUANCE_SIGNATURE_INCOMPLETE);
+
+  IfZeroBytes(SIZE_H, credential->proof.challenge, return ISSUANCE_SIGNATURE_INCOMPLETE);
+  IfZeroBytes(SIZE_H, credential->proof.context, return ISSUANCE_SIGNATURE_INCOMPLETE);
+  IfZeroBytes(SIZE_STATZK, credential->proof.nonce, return ISSUANCE_SIGNATURE_INCOMPLETE);
+  IfZeroBytes(SIZE_N, credential->proof.response, return ISSUANCE_SIGNATURE_INCOMPLETE);
+
+  return ISSUANCE_SIGNATURE_COMPLETE;
 }

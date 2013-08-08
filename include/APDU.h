@@ -57,6 +57,7 @@
 #define INS_ISSUE_CHALLENGE        0x1C
 #define INS_ISSUE_SIGNATURE        0x1D
 #define INS_ISSUE_SIGNATURE_PROOF  0x1E
+#define INS_ISSUE_VERIFY           0x1F
 
 #define INS_PROVE_CREDENTIAL       0x20
 
@@ -97,6 +98,9 @@
 #define P1_SIGNATURE_E      0x02
 #define P1_SIGNATURE_V      0x03
 
+#define P1_SIGNATURE_PROOF_C      0x04
+#define P1_SIGNATURE_PROOF_S_E    0x05
+#define P1_SIGNATURE_PROOF_VERIFY 0x06
 /*
  * Status Word bytes
  */

@@ -27,8 +27,6 @@
 
 #include <stdio.h> // for printf()
 
-#include "types.h"
-
 /**
  * Print a value as debug output.
  *

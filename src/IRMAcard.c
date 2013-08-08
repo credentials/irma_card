@@ -32,6 +32,7 @@
 #include "CHV.h"
 #include "debug.h"
 #include "issuance.h"
+#include "math.h"
 #include "memory.h"
 #include "logging.h"
 #include "random.h"
@@ -58,6 +59,28 @@ PublicData public;
 // Idemix: protocol session variables
 SessionData session;
 Credential *credential;
+unsigned int state;
+
+#define STATE_ISSUE_CREDENTIAL 0x00FF
+#define STATE_ISSUE_SETUP      0x0001
+#define STATE_ISSUE_PUBLIC_KEY 0x0002
+#define STATE_ISSUE_ATTRIBUTES 0x0004
+#define STATE_ISSUE_COMMITTED  0x0008
+#define STATE_ISSUE_CHALLENGED 0x0010
+#define STATE_ISSUE_SIGNATURE  0x0020
+#define STATE_ISSUE_VERIFY     0x0040
+#define STATE_ISSUE_FINISHED   0x0080
+
+#define STATE_PROVE_CREDENTIAL 0x0100
+
+#define matchState(x) \
+  (state != (x))
+
+#define checkState(x) \
+  if (!matchState(x)) { APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED); }
+
+#define nextState() \
+  state <<= 1
 
 // Secure messaging: session parameters
 SM_parameters tunnel;
@@ -243,12 +266,7 @@ void main(void) {
           APDU_return();
         default:
           debugWarning("Unknown instruction");
-          debugInteger("CLA", CLA);
           debugInteger("INS", INS);
-          debugInteger("P1", P1);
-          debugInteger("P2", P2);
-          debugInteger("Lc", Lc);
-          debugValue("data", public.apdu.data, Lc);
           APDU_returnSW(SW_INS_NOT_SUPPORTED);
       }
 
@@ -259,11 +277,6 @@ void main(void) {
     default:
       debugWarning("Unknown class");
       debugInteger("CLA", CLA);
-      debugInteger("INS", INS);
-      debugInteger("P1", P1);
-      debugInteger("P2", P2);
-      debugInteger("Lc", Lc);
-      debugValue("data", public.apdu.data, Lc);
       APDU_returnSW(SW_CLA_NOT_SUPPORTED);
   }
 }
@@ -331,11 +344,19 @@ void processInitialisation(void) {
           APDU_ReturnSW(SW_WRONG_P1P2);
       }
       APDU_ReturnSW(SW_NO_ERROR);
+
+    default:
+      debugWarning("Unknown instruction");
+      debugInteger("INS", INS);
+      APDU_returnSW(SW_INS_NOT_SUPPORTED);
   }
 }
 
 void processIssuance(void) {
   unsigned char flag, i;
+
+  // Issuance requires the terminal to be authenticated.
+  /* Implicit due to the fact that we've got a secure tunnel. */
 
   // Issuance requires the credential PIN to be verified.
   if (!CHV_verified(credPIN)) {
@@ -348,11 +369,7 @@ void processIssuance(void) {
     APDU_checkLength(sizeof(IssuanceSetup));
 
     // Ensure that the master secret is initiaised
-    TestZero(SIZE_M, masterSecret, flag);
-    if (flag != 0) {
-      // Generate a random value to initialise the master secret
-      RandomBits(masterSecret, LENGTH_M);
-    }
+    IfZeroBytes(SIZE_M, masterSecret, RandomBits(masterSecret, LENGTH_M));
 
     // Start a new issuance session
     credential = NULL;
@@ -402,19 +419,25 @@ void processIssuance(void) {
     logEntry->action = ACTION_ISSUE;
     logEntry->credential = credential->id;
 
+    state = STATE_ISSUE_SETUP;
+
     APDU_return();
 
   // All other issuance commands
   } else {
 
-    // A credential should be selected
-    if (credential == NULL) {
+    // A credential should be selected for issuance
+    if (credential == NULL || (state & STATE_ISSUE_CREDENTIAL) == 0) {
       APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
     }
 
     switch (INS) {
       case INS_ISSUE_PUBLIC_KEY:
         debugMessage("INS_ISSUE_PUBLIC_KEY");
+        if (matchState(STATE_ISSUE_SETUP)) {
+          nextState();
+        }
+        checkState(STATE_ISSUE_PUBLIC_KEY);
         APDU_checkLength(SIZE_N);
 
         switch (P1) {
@@ -447,19 +470,23 @@ void processIssuance(void) {
 
           default:
             debugWarning("Unknown parameter");
+            debugInteger("P1", P1);
             APDU_returnSW(SW_WRONG_P1P2);
         }
         APDU_return();
 
       case INS_ISSUE_ATTRIBUTES:
         debugMessage("INS_ISSUE_ATTRIBUTES");
+        if (matchState(STATE_ISSUE_PUBLIC_KEY) && issuance_checkPublicKey(credential)) {
+          nextState();
+        }
+        checkState(STATE_ISSUE_ATTRIBUTES);
         APDU_checkLength(SIZE_M);
         APDU_checkP1range(1, credential->size);
-        TestZero(SIZE_M, public.apdu.data, flag);
-        if (flag != 0) {
+        IfZero(SIZE_M, public.apdu.data,
           debugWarning("Attribute cannot be empty");
           APDU_returnSW(SW_WRONG_DATA);
-        }
+        );
 
         Copy(SIZE_M, credential->attribute[P1 - 1], public.apdu.data);
         debugIndexedCLMessage("Initialised attribute", credential->attribute, P1 - 1);
@@ -467,16 +494,22 @@ void processIssuance(void) {
 
       case INS_ISSUE_COMMITMENT:
         debugMessage("INS_ISSUE_COMMITMENT");
+        if (!matchState(STATE_ISSUE_ATTRIBUTES) && !issuance_checkAttributes(credential)) {
+          APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
+        }
         APDU_checkLength(SIZE_STATZK);
 
         Copy(SIZE_STATZK, public.issue.nonce, public.apdu.data);
         debugNonce("Initialised nonce", public.issue.nonce);
         constructCommitment(credential, &masterSecret[0]);
         debugNumber("Returned U", public.apdu.data);
+
+        nextState();
         APDU_returnLa(SIZE_N);
 
       case INS_ISSUE_COMMITMENT_PROOF:
         debugMessage("INS_ISSUE_COMMITMENT_PROOF");
+        checkState(STATE_ISSUE_COMMITTED);
         APDU_checkLength(0);
 
         switch (P1) {
@@ -500,19 +533,27 @@ void processIssuance(void) {
 
           default:
             debugWarning("Unknown parameter");
+            debugInteger("P1", P1);
             APDU_returnSW(SW_WRONG_P1P2);
         }
 
       case INS_ISSUE_CHALLENGE:
         debugMessage("INS_ISSUE_CHALLENGE");
+        checkState(STATE_ISSUE_COMMITTED);
         APDU_checkLength(0);
 
         Copy(SIZE_STATZK, public.apdu.data, credential->proof.nonce);
         debugNonce("Returned nonce", public.apdu.data);
+
+        nextState();
         APDU_returnLa(SIZE_STATZK);
 
       case INS_ISSUE_SIGNATURE:
         debugMessage("INS_ISSUE_SIGNATURE");
+        if (matchState(STATE_ISSUE_CHALLENGED)) {
+          nextState();
+        }
+        checkState(STATE_ISSUE_SIGNATURE);
 
         switch(P1) {
           case P1_SIGNATURE_A:
@@ -536,42 +577,18 @@ void processIssuance(void) {
             debugValue("Initialised signature.v", credential->signature.v, SIZE_V);
             break;
 
-          case P1_SIGNATURE_VERIFY:
-            debugMessage("P1_SIGNATURE_VERIFY");
-            APDU_checkLength(0);
-            verifySignature(credential, &masterSecret[0], &session.vfySig);
-            debugMessage("Verified signature");
-            break;
-
-          default:
-            debugWarning("Unknown parameter");
-            APDU_returnSW(SW_WRONG_P1P2);
-        }
-        APDU_return();
-
-      case INS_ISSUE_SIGNATURE_PROOF:
-        debugMessage("INS_ISSUE_SIGNATURE_PROOF");
-
-        switch(P1) {
-          case P1_PROOF_C:
+          case P1_SIGNATURE_PROOF_C:
             debugMessage("P1_SIGNATURE_PROOF_C");
             APDU_checkLength(SIZE_H);
             Copy(SIZE_H, credential->proof.challenge, public.apdu.data);
             debugHash("Initialised c", credential->proof.challenge);
             break;
 
-          case P1_PROOF_S_E:
+          case P1_SIGNATURE_PROOF_S_E:
             debugMessage("P1_SIGNATURE_PROOF_S_E");
             APDU_checkLength(SIZE_N);
             Copy(SIZE_N, credential->proof.response, public.apdu.data);
             debugNumber("Initialised s_e", credential->proof.response);
-            break;
-
-          case P1_PROOF_VERIFY:
-            debugMessage("P1_SIGNATURE_PROOF_VERIFY");
-            APDU_checkLength(0);
-            verifyProof(credential, &session.vfyPrf, &public.vfyPrf);
-            debugMessage("Verified proof");
             break;
 
           default:
@@ -580,8 +597,27 @@ void processIssuance(void) {
         }
         APDU_return();
 
+      case INS_ISSUE_VERIFY:
+        if (matchState(STATE_ISSUE_SIGNATURE) && issuance_checkSignature(credential)) {
+          nextState();
+        }
+        checkState(STATE_ISSUE_VERIFY);
+
+        if (!verifySignature(credential, &masterSecret[0], &session.vfySig)) {
+          debugWarning("Signature invalid");
+          APDU_returnSW(SW_DATA_INVALID);
+        }
+        if (!verifyProof(credential, &session.vfyPrf, &public.vfyPrf)) {
+          debugWarning("Proof invalid");
+          APDU_returnSW(SW_DATA_INVALID);
+        }
+
+        nextState();
+        APDU_return();
+
       default:
-        // TODO: unknown
+        debugWarning("Unknown instruction");
+        debugInteger("INS", INS);
         APDU_returnSW(SW_INS_NOT_SUPPORTED);
     }
   }
@@ -590,10 +626,8 @@ void processIssuance(void) {
 void processVerification(void) {
   unsigned char i;
 
-  // Issuance requires the credential PIN to be verified.
-  if (!CHV_verified(credPIN)) {
-    APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
-  }
+  // Verification requires the terminal to be authenticated.
+  /* Implicit due to the fact that we've got a secure tunnel. */
 
   // Special case: start verification
   if (INS == INS_PROVE_CREDENTIAL) {
@@ -647,13 +681,15 @@ void processVerification(void) {
     logEntry->credential = credential->id;
     logEntry->details.prove.selection = session.prove.disclose;
 
+    state = STATE_PROVE_CREDENTIAL;
+
     APDU_return();
 
   // All other verification commands
   } else {
 
-    // A credential should be selected, except for issuance setup.
-    if (credential == NULL) {
+    // A credential should be selected for verification
+    if (credential == NULL || (state & STATE_PROVE_CREDENTIAL) == 0) {
       APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
     }
 

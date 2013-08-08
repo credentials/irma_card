@@ -129,7 +129,7 @@ void ClearBytes(int size, void *buffer) {
  * Clear the current credential.
  */
 void ClearCredential(Credential *credential) {
-  Byte i;
+  unsigned char i;
 
   // Put the address of the credential on the stack
   __push(credential);
