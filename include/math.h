@@ -82,7 +82,7 @@ do { \
   #define ModExp ModExpSecure
 #endif // !ModExp
 
-extern MATH_flag;
+extern unsigned char MATH_flag;
 
 #define IfCarry(action) \
 do { \
@@ -90,7 +90,7 @@ do { \
   __code(PRIM, PRIM_BIT_MANIPULATE_BYTE, (1<<7 | 3), (1<<3)); \
   __code(PRIM, PRIM_SHIFT_RIGHT, 1, 3); \
   __code(STORE, &MATH_flag, 1); \
-  if (MATH_flag) { action; } \
+  if (MATH_flag != 0x00) { action; } \
 } while (0)
 
 #define IfZero(bytes, value, action) \
@@ -99,18 +99,19 @@ do { \
   __code(PRIM, PRIM_LOAD_CCR); \
   __code(PRIM, PRIM_BIT_MANIPULATE_BYTE, (1<<7 | 3), 1); \
   __code(STORE, &MATH_flag, 1); \
-  if (MATH_flag) { action; } \
+  if (MATH_flag != 0x00) { action; } \
 } while (0)
 
 #define IfZeroBytes(bytes, value, action) \
 do { \
-  __push(BLOCKCAST(bytes)(value)); \
+  __push((void *)(value)); \
+  __code(LOADI, bytes); \
   __code(TESTN, bytes); \
   __code(PRIM, PRIM_LOAD_CCR); \
   __code(PRIM, PRIM_BIT_MANIPULATE_BYTE, (1<<7 | 3), 1); \
   __code(STORE, &MATH_flag, 1); \
-  __code(POPN, bytes); \
-  if (MATH_flag) { action; } \
+  __code(POPN, bytes + sizeof(void *)); \
+  if (MATH_flag != 0x00) { action; } \
 } while (0)
 
 #endif // __MATH_H
