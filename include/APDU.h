@@ -156,9 +156,9 @@
 #define APDU_checkP1P2(value) \
   if (P1P2 != value) { APDU_returnSW(SW_WRONG_P1P2); }
 
+// FIXME: drop length != 0 check when using wrapping
 #define APDU_checkLength(length) \
-  if (Lc != (length)) { APDU_returnSW(SW_WRONG_LENGTH); }
-
+  if (APDU_wrapped || 0 != (length)) { if (Lc != (length)) { APDU_returnSW(SW_WRONG_LENGTH); } }
 
 #define APDU_ReturnSW(sw) \
   __SW = (sw); \
