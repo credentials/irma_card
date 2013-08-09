@@ -39,4 +39,11 @@ void RandomBytes(unsigned char *buffer, unsigned int bytes);
  */
 void RandomBits(unsigned char *buffer, unsigned int bytes);
 
+#ifdef FAKE_RANDOM
+
+void FakeRandomBytes(unsigned char *buffer, unsigned int bytes);
+void FakeRandomBits(unsigned char *buffer, unsigned int bytes);
+
+#endif // FAKE_RANDOM
+
 #endif // __random_H

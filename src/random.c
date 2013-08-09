@@ -25,10 +25,10 @@
 #include "MULTOS.h"
 
 /**
- * Generate a random number in the buffer of length bits
+ * Generate a random number in the buffer of the given number of bytes
  *
  * @param buffer to store the generated random number
- * @param length in bytes of the random number to generate
+ * @param bytes number of random bytes to generate
  */
 void RandomBytes(unsigned char *buffer, unsigned int bytes) {
   unsigned char number[8];
@@ -63,8 +63,41 @@ void RandomBytes(unsigned char *buffer, unsigned int bytes) {
  */
 void RandomBits(unsigned char *buffer, unsigned int bits) {
   RandomBytes(buffer, (bits + 7) / 8);
-  
+
   if (bits % 8 != 0) {
     buffer[0] &= 0xFF >> (8 - (bits % 8));
   }
 }
+
+#ifdef FAKE_RANDOM
+
+/**
+ * Generate a random number in the buffer of the given number of bytes
+ *
+ * @param buffer to store the generated random number
+ * @param bytes number of random bytes to generate
+ */
+void FakeRandomBytes(unsigned char *buffer, unsigned int bytes) {
+  buffer += bytes;
+
+  // Generate the fake random number
+  while (bytes > 0) {
+    *(--buffer) = bytes--;
+  }
+}
+
+/**
+ * Generate a fake random number in the buffer of length bits
+ *
+ * @param buffer to store the generated fake random number
+ * @param length in bits of the fake random number to generate
+ */
+void FakeRandomBits(unsigned char *buffer, unsigned int bits) {
+  FakeRandomBytes(buffer, (bits + 7) / 8);
+
+  if (bits % 8 != 0) {
+    buffer[0] &= 0xFF >> (8 - (bits % 8));
+  }
+}
+
+#endif // FAKE_RANDOM
