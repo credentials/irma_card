@@ -59,6 +59,12 @@ PublicData public;
 // Idemix: protocol session variables
 SessionData session;
 Credential *credential;
+
+// Secure messaging: session parameters
+SM_parameters tunnel;
+Terminal terminal;
+
+// State administration
 unsigned int state;
 
 #define STATE_ISSUE_CREDENTIAL 0x00FF
@@ -71,10 +77,14 @@ unsigned int state;
 #define STATE_ISSUE_VERIFY     0x0040
 #define STATE_ISSUE_FINISHED   0x0080
 
-#define STATE_PROVE_CREDENTIAL 0x0100
+#define STATE_PROVE_CREDENTIAL 0x0F00
+#define STATE_PROVE_SETUP      0x0100
+#define STATE_PROVE_COMMITTED  0x0200
+#define STATE_PROVE_SIGNATURE  0x0400
+#define STATE_PROVE_ATTRIBUTES 0x0800
 
 #define matchState(x) \
-  (state != (x))
+  ((state & (x)) != 0)
 
 #define checkState(x) \
   if (!matchState(x)) { APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED); }
@@ -82,9 +92,6 @@ unsigned int state;
 #define nextState() \
   state <<= 1
 
-// Secure messaging: session parameters
-SM_parameters tunnel;
-Terminal terminal;
 
 /********************************************************************/
 /* Static segment (application EEPROM memory) variable declarations */
@@ -352,8 +359,66 @@ void processInitialisation(void) {
   }
 }
 
+
+void startIssuance(void) {
+  unsigned char i;
+
+  // Ensure that the master secret is initiaised
+  IfZeroBytes(SIZE_M, masterSecret, RandomBits(masterSecret, LENGTH_M));
+
+  // Start a new issuance session
+  credential = NULL;
+
+  // Check policy
+  if (!auth_checkIssuance(&terminal, public.issuanceSetup.id)) {
+    APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
+  }
+
+  // Locate a credential slot
+  for (i = 0; i < MAX_CRED; i++) {
+    // Reuse the existing credential slot.
+    if (credentials[i].id == public.issuanceSetup.id) {
+      debugMessage("Credential already exists");
+      if (!auth_checkOverwrite(&terminal, public.issuanceSetup.id)) {
+        debugWarning("Overwrite not allowed");
+        APDU_returnSW(SW_COMMAND_NOT_ALLOWED_AGAIN);
+      } else {
+        credential = &credentials[i];
+        break;
+      }
+
+    // Use a new credential slot
+    } else if (credentials[i].id == 0 && credential == NULL) {
+      debugMessage("Found empty slot");
+      credential = &credentials[i];
+    }
+  }
+
+  // No credential slot selected, out of space
+  if (credential == NULL) {
+    debugWarning("Cannot issue another credential");
+    APDU_returnSW(SW_COMMAND_NOT_ALLOWED);
+  }
+
+  // Initialise the credential
+  credential->id = public.issuanceSetup.id;
+  credential->size = public.issuanceSetup.size;
+  credential->issuerFlags = public.issuanceSetup.flags;
+  Copy(SIZE_H, credential->proof.context, public.issuanceSetup.context);
+  debugHash("Initialised context", credential->proof.context);
+
+  // Create new log entry
+  logEntry = (IRMALogEntry*) log_new_entry(&log);
+  Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.issuanceSetup.timestamp);
+  Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
+  logEntry->action = ACTION_ISSUE;
+  logEntry->credential = credential->id;
+
+  // Initialise the issuance state
+  state = STATE_ISSUE_SETUP;
+}
+
 void processIssuance(void) {
-  unsigned char flag, i;
 
   // Issuance requires the terminal to be authenticated.
   /* Implicit due to the fact that we've got a secure tunnel. */
@@ -368,58 +433,7 @@ void processIssuance(void) {
     debugMessage("INS_ISSUE_CREDENTIAL");
     APDU_checkLength(sizeof(IssuanceSetup));
 
-    // Ensure that the master secret is initiaised
-    IfZeroBytes(SIZE_M, masterSecret, RandomBits(masterSecret, LENGTH_M));
-
-    // Start a new issuance session
-    credential = NULL;
-
-    // Check policy
-    if (!auth_checkIssuance(&terminal, public.issuanceSetup.id)) {
-      APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
-    }
-
-    // Locate a credential slot
-    for (i = 0; i < MAX_CRED; i++) {
-      // Reuse the existing credential slot.
-      if (credentials[i].id == public.issuanceSetup.id) {
-        debugMessage("Credential already exists");
-        if (!auth_checkOverwrite(&terminal, public.issuanceSetup.id)) {
-          debugWarning("Overwrite not allowed");
-          APDU_returnSW(SW_COMMAND_NOT_ALLOWED_AGAIN);
-        } else {
-          credential = &credentials[i];
-          break;
-        }
-
-      // Use a new credential slot
-      } else if (credentials[i].id == 0 && credential == NULL) {
-        debugMessage("Found empty slot");
-        credential = &credentials[i];
-      }
-    }
-
-    // No credential slot selected, out of space
-    if (credential == NULL) {
-      debugWarning("Cannot issue another credential");
-      APDU_returnSW(SW_COMMAND_NOT_ALLOWED);
-    }
-
-    // Initialise the credential
-    credential->id = public.issuanceSetup.id;
-    credential->size = public.issuanceSetup.size;
-    credential->issuerFlags = public.issuanceSetup.flags;
-    Copy(SIZE_H, credential->proof.context, public.issuanceSetup.context);
-    debugHash("Initialised context", credential->proof.context);
-
-    // Create new log entry
-    logEntry = (IRMALogEntry*) log_new_entry(&log);
-    Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.issuanceSetup.timestamp);
-    Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
-    logEntry->action = ACTION_ISSUE;
-    logEntry->credential = credential->id;
-
-    state = STATE_ISSUE_SETUP;
+    startIssuance();
 
     APDU_return();
 
@@ -427,7 +441,7 @@ void processIssuance(void) {
   } else {
 
     // A credential should be selected for issuance
-    if (credential == NULL || (state & STATE_ISSUE_CREDENTIAL) == 0) {
+    if (credential == NULL || !matchState(STATE_ISSUE_CREDENTIAL)) {
       APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
     }
 
@@ -623,8 +637,60 @@ void processIssuance(void) {
   }
 }
 
-void processVerification(void) {
+void startVerification(void) {
   unsigned char i;
+
+  // Start a new verification session
+  credential = NULL;
+  ClearBytes(sizeof(VerificationSession), &(session.prove));
+
+  // Check policy
+  if (!auth_checkSelection(&terminal, public.verificationSetup.id, public.verificationSetup.selection)) {
+    APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
+  }
+
+  // Lookup the credential slot
+  for (i = 0; i < MAX_CRED; i++) {
+    if (credentials[i].id == public.verificationSetup.id) {
+      credential = &credentials[i];
+    }
+  }
+
+  // No credential slot selected,
+  if (credential == NULL) {
+    debugWarning("Credential not found");
+    APDU_returnSW(SW_REFERENCED_DATA_NOT_FOUND);
+  }
+
+  // Check selection validity
+  if (verifySelection(credential, public.verificationSetup.selection) < 0) {
+    credential = NULL;
+    APDU_returnSW(SW_WRONG_DATA);
+  }
+
+  // Check PIN protection
+  if (verifyProtection(credential, public.verificationSetup.selection) && !CHV_verified(credPIN)) {
+    credential = NULL;
+    APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+  }
+
+  // Initialise the session
+  session.prove.disclose = public.verificationSetup.selection;
+  Copy(SIZE_H, public.prove.context, public.verificationSetup.context);
+  debugHash("Initialised context", public.prove.context);
+
+  // Create new log entry
+  logEntry = (IRMALogEntry*) log_new_entry(&log);
+  Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.verificationSetup.timestamp);
+  Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
+  logEntry->action = ACTION_PROVE;
+  logEntry->credential = credential->id;
+  logEntry->details.prove.selection = session.prove.disclose;
+
+  state = STATE_PROVE_CREDENTIAL;
+}
+
+void processVerification(void) {
 
   // Verification requires the terminal to be authenticated.
   /* Implicit due to the fact that we've got a secure tunnel. */
@@ -634,54 +700,7 @@ void processVerification(void) {
     debugMessage("INS_PROVE_CREDENTIAL");
     APDU_checkLength(sizeof(VerificationSetup));
 
-    // Start a new verification session
-    credential = NULL;
-    ClearBytes(sizeof(VerificationSession), &(session.prove));
-
-    // Check policy
-    if (!auth_checkSelection(&terminal, public.verificationSetup.id, public.verificationSetup.selection)) {
-      APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
-    }
-
-    // Lookup the credential slot
-    for (i = 0; i < MAX_CRED; i++) {
-      if (credentials[i].id == public.verificationSetup.id) {
-        credential = &credentials[i];
-      }
-    }
-
-    // No credential slot selected,
-    if (credential == NULL) {
-      debugWarning("Credential not found");
-      APDU_returnSW(SW_REFERENCED_DATA_NOT_FOUND);
-    }
-
-    // Check selection validity
-    if (verifySelection(credential, public.verificationSetup.selection) < 0) {
-      credential = NULL;
-      APDU_returnSW(SW_WRONG_DATA);
-    }
-
-    // Check PIN protection
-    if (verifyProtection(credential, public.verificationSetup.selection) && !CHV_verified(credPIN)) {
-      credential = NULL;
-      APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
-    }
-
-    // Initialise the session
-    session.prove.disclose = public.verificationSetup.selection;
-    Copy(SIZE_H, public.prove.context, public.verificationSetup.context);
-    debugHash("Initialised context", public.prove.context);
-
-    // Create new log entry
-    logEntry = (IRMALogEntry*) log_new_entry(&log);
-    Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.verificationSetup.timestamp);
-    Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
-    logEntry->action = ACTION_PROVE;
-    logEntry->credential = credential->id;
-    logEntry->details.prove.selection = session.prove.disclose;
-
-    state = STATE_PROVE_CREDENTIAL;
+    startVerification();
 
     APDU_return();
 
@@ -689,20 +708,28 @@ void processVerification(void) {
   } else {
 
     // A credential should be selected for verification
-    if (credential == NULL || (state & STATE_PROVE_CREDENTIAL) == 0) {
+    if (credential == NULL || !matchState(STATE_PROVE_CREDENTIAL)) {
       APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
     }
 
     switch (INS) {
       case INS_PROVE_COMMITMENT:
         debugMessage("INS_PROVE_COMMITMENT");
+        checkState(STATE_PROVE_SETUP);
         APDU_checkLength(SIZE_STATZK);
+
         constructProof(credential, &masterSecret[0]);
         debugHash("Returned c", public.apdu.data);
+
+        nextState();
         APDU_returnLa(SIZE_H);
 
       case INS_PROVE_SIGNATURE:
         debugMessage("INS_PROVE_SIGNATURE");
+        if (matchState(STATE_PROVE_COMMITTED)) {
+          nextState();
+        }
+        checkState(STATE_PROVE_SIGNATURE);
 
         switch(P1) {
           case P1_SIGNATURE_A:
@@ -742,9 +769,11 @@ void processVerification(void) {
 
       case INS_PROVE_ATTRIBUTE:
         debugMessage("INS_PROVE_ATTRIBUTE");
-        if (!(APDU_wrapped || CheckCase(1))) {
-          APDU_returnSW(SW_WRONG_LENGTH);
+        if (matchState(STATE_PROVE_SIGNATURE)) {
+          nextState();
         }
+        checkState(STATE_PROVE_ATTRIBUTES);
+        APDU_checkLength(0);
         if (P1 > credential->size) {
           APDU_returnSW(SW_WRONG_P1P2);
         }
