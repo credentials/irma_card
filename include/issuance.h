@@ -65,8 +65,9 @@ int issuance_checkSignature(Credential *credential);
 
 /**
  * Compute the response value vPrimeHat = vPrimeTilde + c*vPrime
- * 
- * Requires vPrimeTilde to be stored in vPrimeHat.
+ *
+ * Requires vPrimeTilde to be stored in vPrimeHat and SIZE_VPRIME_ free
+ * space in public.issue.buffer.data.
  */
 #define crypto_compute_vPrimeHat() \
 do { \
@@ -84,17 +85,17 @@ do { \
   __push(BLOCKCAST(SIZE_VPRIME/2)(session.issue.vPrime)); \
   __code(PRIM, PRIM_MULTIPLY, SIZE_VPRIME/2); \
   /* Combine the two multiplications into a single result */\
-  __code(ADDN, public.issue.buffer.data, SIZE_VPRIME_ - SIZE_VPRIME/2); \
+  __code(ADDN, public.issue.buffer.data, SIZE_VPRIME_ - SIZE_VPRIME/2); /* WILL NEVER CAUSE A CARRY (due to small sizes) */\
   __code(POPN, SIZE_VPRIME); \
   /* Add vPrimeTilde and store the result in vPrimeHat */\
   __push(BLOCKCAST(SIZE_VPRIME_)(public.issue.buffer.data)); \
-  __code(ADDN, session.issue.vPrimeHat, SIZE_VPRIME_); \
+  __code(ADDN, session.issue.vPrimeHat, SIZE_VPRIME_); /* WILL NEVER CAUSE A CARRY (due to vTilde correction) */\
   __code(POPN, SIZE_VPRIME_); \
 } while (0)
 
 /**
  * Compute the response value sHat = sTilde + c * s
- * 
+ *
  * Requires sTilde to be stored in sHat.
  */
 #define crypto_compute_sHat() \
@@ -105,8 +106,7 @@ do { \
   __push(BLOCKCAST(SIZE_M)(masterSecret)); \
   __code(PRIM, PRIM_MULTIPLY, SIZE_M); \
   /* Add the result of the multiplication to sTilde and store in sHat */\
-  __code(ADDN, session.issue.sHat, SIZE_S_); \
-  /* Cleanup the stack */\
+  __code(ADDN, session.issue.sHat, SIZE_S_); /* WILL NEVER CAUSE A CARRY (due to sHat being oversized) */\
   __code(POPN, SIZE_S_); \
 } while (0)
 

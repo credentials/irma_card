@@ -74,7 +74,7 @@ void constructCommitment(Credential *credential, unsigned char *masterSecret) {
 
   // Compute P1:
   // - Generate random vPrimeTilde, mTilde[0]
-  RandomBits(session.issue.vPrimeHat, LENGTH_VPRIME_);
+  RandomBits(session.issue.vPrimeHat, LENGTH_VPRIME_ - 1); // Correction to prevent overflows
   debugValue("vPrimeTilde", session.issue.vPrimeHat, SIZE_VPRIME_);
   RandomBits(session.issue.sHat, LENGTH_S_);
   debugValue("sTilde", session.issue.sHat, SIZE_S_);
@@ -254,29 +254,30 @@ int verifyProof(Credential *credential, IssuanceProofSession *session, IssuanceP
 }
 
 int issuance_checkPublicKey(Credential *credential) {
-  unsigned char i;
+  unsigned char i = 0;
 
   IfZeroBytes(SIZE_N, credential->issuerKey.n, return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
   IfZeroBytes(SIZE_N, credential->issuerKey.S, return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
   IfZeroBytes(SIZE_N, credential->issuerKey.Z, return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
-  for (i = 0; i < credential->size + 1; i++) {
-    IfZeroBytes(SIZE_N, credential->issuerKey.R[i], return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
+  while (i < credential->size + 1) {
+    IfZeroBytes(SIZE_N, credential->issuerKey.R[i++], return ISSUANCE_PUBLIC_KEY_INCOMPLETE);
   }
 
   return ISSUANCE_PUBLIC_KEY_COMPLETE;
 }
 
 int issuance_checkAttributes(Credential *credential) {
-  unsigned char i;
+  unsigned char i = 0;
 
-  for (i = 0; i < credential->size; i++) {
-    IfZeroBytes(SIZE_N, credential->attribute[i], return ISSUANCE_ATTRIBUTES_INCOMPLETE);
+  while (i < credential->size) {
+    IfZeroBytes(SIZE_N, credential->attribute[i++], return ISSUANCE_ATTRIBUTES_INCOMPLETE);
   }
 
   return ISSUANCE_ATTRIBUTES_COMPLETE;
 }
 
 int issuance_checkSignature(Credential *credential) {
+
   IfZeroBytes(SIZE_N, credential->signature.A, return ISSUANCE_SIGNATURE_INCOMPLETE);
   IfZeroBytes(SIZE_E, credential->signature.e, return ISSUANCE_SIGNATURE_INCOMPLETE);
   IfZeroBytes(SIZE_V, credential->signature.v, return ISSUANCE_SIGNATURE_INCOMPLETE);
