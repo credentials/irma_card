@@ -123,8 +123,13 @@ int SM_ISO7816_4_unpad(unsigned char *data, unsigned int *length);
   if (APDU_wrapped) { SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); } \
   __code(SYSTEM, 4)
 
+// SM_return with optional wrapping
 #define SM_return() \
-  SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); \
+  if (APDU_wrapped) { SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); } \
   __code(SYSTEM, 4);
+
+//#define SM_return() \
+//  SM_APDU_wrap(public.apdu.data, public.apdu.session, &tunnel); \
+//  __code(SYSTEM, 4);
 
 #endif // __SM_H
