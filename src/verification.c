@@ -66,11 +66,25 @@ int verifySelection(Credential *credential, unsigned int selection) {
   return VERIFICATION_SELECTION_VALID;
 }
 
+unsigned int realSize(unsigned char *buffer, unsigned int size) {
+  while (*buffer == 0) {
+    buffer++;
+    size--;
+  }
+
+  return size;
+}
+
 /**
  * Construct a proof.
  */
 void constructProof(Credential *credential, unsigned char *masterSecret) {
   unsigned char i;
+  unsigned int rA_size;
+  unsigned int rA_offset;
+  rA_size = realSize(credential->signature.v, SIZE_V) - 1 - realSize(credential->signature.e, SIZE_E);
+  if (rA_size > SIZE_R_A) { rA_size = SIZE_R_A; }
+  rA_offset = SIZE_R_A - rA_size;
 
   // Generate random values for m~[i], e~, v~ and rA
   for (i = 0; i <= credential->size; i++) {
@@ -87,13 +101,14 @@ void constructProof(Credential *credential, unsigned char *masterSecret) {
   RandomBits(public.prove.vHat, LENGTH_V_ - 1);
   debugValue("vTilde", public.prove.vHat, SIZE_V_);
   // IMPORTANT: Correction to the length of rA to prevent negative values
-  RandomBits(public.prove.rA + 1, LENGTH_R_A - 13);
-  public.prove.rA[0] = 0x00; // Set first byte of rA, since it's not set by RandomBits command
+  RandomBits(public.prove.rA + rA_offset, rA_size * 8 - 1);
+  for (i = 0; i < rA_offset; i++) {
+    public.prove.rA[i] = 0x00; // Set first byte(s) of rA, since it's not set by RandomBits command
+  }
   debugValue("rA", public.prove.rA, SIZE_R_A);
 
   // Compute A' = A * S^r_A
-  // IMPORTANT: Correction to the size of rA to skip initial zero bytes
-  ModExpSpecial(credential, SIZE_R_A - 1, public.prove.rA + 1, public.prove.APrime, public.prove.buffer.number[0]);
+  ModExpSpecial(credential, SIZE_R_A, public.prove.rA, public.prove.APrime, public.prove.buffer.number[0]);
   debugValue("A' = S^r_A mod n", public.prove.APrime, SIZE_N);
   ModMul(SIZE_N, public.prove.APrime, credential->signature.A, credential->issuerKey.n);
   debugValue("A' = A' * A mod n", public.prove.APrime, SIZE_N);

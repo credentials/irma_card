@@ -63,12 +63,28 @@ do { \
   __code(ADDN, public.prove.buffer.data, SIZE_V - SIZE_R_A/2); \
   __code(POPN, 2*SIZE_E); \
   /* Subtract from v and store the result in v' */\
+  __push(BLOCKCAST(SIZE_V/2 + 1)(credential->signature.v + SIZE_V/2)); \
+  __push(BLOCKCAST(SIZE_V/2 + 1)(public.prove.buffer.data + SIZE_V/2)); \
+  __code(SUBN, SIZE_V/2 + 1); \
+  IfCarry( \
+    debugMessage("Subtraction with borrow, adding 1"); \
+    __code(INCN, public.prove.buffer.data, SIZE_V/2); \
+  ); \
+  __code(POPN, SIZE_V/2 + 1); \
+  __code(STORE, public.prove.buffer.data + SIZE_V/2, SIZE_V/2 + 1); \
+  __push(BLOCKCAST(SIZE_V/2)(credential->signature.v)); \
+  __push(BLOCKCAST(SIZE_V/2)(public.prove.buffer.data)); \
+  __code(SUBN, SIZE_V/2); \
+  __code(POPN, SIZE_V/2); \
+  __code(STORE, public.prove.buffer.data, SIZE_V/2); \
+} while (0)
+/* Simple subtraction does not fit on the stack.
   __push(BLOCKCAST(SIZE_V)(credential->signature.v)); \
   __push(BLOCKCAST(SIZE_V)(public.prove.buffer.data)); \
   __code(SUBN, SIZE_V); \
   __code(POPN, SIZE_V); \
   __code(STORE, public.prove.buffer.data, SIZE_V); \
-} while (0)
+} while (0) */
 
 /**
  * Compute the response value vHat = vTilde + c*v'.
