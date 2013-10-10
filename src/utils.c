@@ -29,6 +29,8 @@
 #include "SHA.h"
 #include "types.h"
 
+extern DebugData debug;
+
 /********************************************************************/
 /* Cryptographic helper functions                                   */
 /********************************************************************/
@@ -98,8 +100,10 @@ void ModExpSpecial(Credential *credential, int size, ByteArray exponent, ByteArr
     // Compute result = S^(exponent_bottom) * S_^(exponent_top)
     ModExp(SIZE_S_EXPONENT, SIZE_N, exponent + size - SIZE_S_EXPONENT,
       credential->issuerKey.n, credential->issuerKey.S, result);
+//    Copy(SIZE_N, debug.modexpA, result);
     ModExp(size - SIZE_S_EXPONENT, SIZE_N,
       exponent, credential->issuerKey.n, credential->issuerKey.S_, buffer);
+//    Copy(SIZE_N, debug.modexpB, buffer);
     ModMul(SIZE_N, result, buffer, credential->issuerKey.n);
   } else {
     // Compute result = S^exponent

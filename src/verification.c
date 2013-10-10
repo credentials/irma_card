@@ -32,6 +32,7 @@
 
 extern PublicData public;
 extern SessionData session;
+extern DebugData debug;
 
 /********************************************************************/
 /* Proving functions                                                */
@@ -91,20 +92,27 @@ void constructProof(Credential *credential, unsigned char *masterSecret) {
     if (disclosed(i) == 0) {
       // IMPORTANT: Correction to the length of mTilde to prevent overflows
       RandomBits(session.prove.mHat[i], LENGTH_M_ - 1);
+      Copy(SIZE_M_, debug.mTilde[i], session.prove.mHat[i]);
     }
   }
   debugValues("mTilde", session.prove.mHat, SIZE_M_, SIZE_L);
   // IMPORTANT: Correction to the length of eTilde to prevent overflows
   RandomBits(public.prove.eHat, LENGTH_E_ - 1);
+  Copy(SIZE_E_, debug.eTilde, public.prove.eHat);
   debugValue("eTilde", public.prove.eHat, SIZE_E_);
   // IMPORTANT: Correction to the length of vTilde to prevent overflows
-  RandomBits(public.prove.vHat, LENGTH_V_ - 1);
+  FakeRandomBits(public.prove.vHat, LENGTH_V_ - 1);
+  for (i = 0; i < 0; i++) {
+    public.prove.vHat[i] = 0x00;
+  }
+  Copy(SIZE_V_, debug.vTilde, public.prove.vHat);
   debugValue("vTilde", public.prove.vHat, SIZE_V_);
   // IMPORTANT: Correction to the length of rA to prevent negative values
-  RandomBits(public.prove.rA + rA_offset, rA_size * 8 - 1);
+  FakeRandomBits(public.prove.rA + rA_offset, rA_size * 8 - 1);
   for (i = 0; i < rA_offset; i++) {
     public.prove.rA[i] = 0x00; // Set first byte(s) of rA, since it's not set by RandomBits command
   }
+  Copy(SIZE_R_A, debug.rA, public.prove.rA);
   debugValue("rA", public.prove.rA, SIZE_R_A);
 
   // Compute A' = A * S^r_A
@@ -116,18 +124,36 @@ void constructProof(Credential *credential, unsigned char *masterSecret) {
   // Compute ZTilde = A'^eTilde * S^vTilde * (R[i]^mTilde[i] foreach i not in D)
   ModExpSpecial(credential, SIZE_V_, public.prove.vHat, public.prove.buffer.number[0], public.prove.buffer.number[1]);
   debugValue("ZTilde = S^vTilde", public.prove.buffer.number[0], SIZE_N);
+  Copy(SIZE_N, debug.SvTilde, public.prove.buffer.number[0]);
   ModExp(SIZE_E_, SIZE_N, public.prove.eHat, credential->issuerKey.n, public.prove.APrime, public.prove.buffer.number[1]);
   debugValue("buffer = A'^eTilde", public.prove.buffer.number[1], SIZE_N);
+  Copy(SIZE_N, debug.AeTilde, public.prove.buffer.number[1]);
   ModMul(SIZE_N, public.prove.buffer.number[0], public.prove.buffer.number[1], credential->issuerKey.n);
   debugValue("ZTilde = ZTilde * buffer", public.prove.buffer.number[0], SIZE_N);
+  Copy(SIZE_N, debug.SvAeTilde, public.prove.buffer.number[0]);
+  Clear(SIZE_N, debug.exp[0]);
+  Clear(SIZE_N, debug.exp[1]);
+  Clear(SIZE_N, debug.exp[2]);
+  Clear(SIZE_N, debug.exp[3]);
+  Clear(SIZE_N, debug.exp[4]);
+  Clear(SIZE_N, debug.exp[5]);
+  Clear(SIZE_N, debug.mul[0]);
+  Clear(SIZE_N, debug.mul[1]);
+  Clear(SIZE_N, debug.mul[2]);
+  Clear(SIZE_N, debug.mul[3]);
+  Clear(SIZE_N, debug.mul[4]);
+  Clear(SIZE_N, debug.mul[5]);
   for (i = 0; i <= credential->size; i++) {
     if (disclosed(i) == 0) {
       ModExp(SIZE_M_, SIZE_N, session.prove.mHat[i], credential->issuerKey.n, credential->issuerKey.R[i], public.prove.buffer.number[1]);
+      Copy(SIZE_N, debug.exp[i], public.prove.buffer.number[1]);
       debugValue("R_i^m_i", public.prove.buffer.number[1], SIZE_N);
       ModMul(SIZE_N, public.prove.buffer.number[0], public.prove.buffer.number[1], credential->issuerKey.n);
+      Copy(SIZE_N, debug.mul[i], public.prove.buffer.number[0]);
       debugValue("ZTilde = ZTilde * buffer", public.prove.buffer.number[0], SIZE_N);
     }
   }
+  Copy(SIZE_N, debug.ZTilde, public.prove.buffer.number[0]);
 
   // Compute challenge c = H(context | A' | ZTilde | nonce)
   public.prove.list[0].data = public.prove.context;

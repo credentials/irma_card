@@ -184,6 +184,22 @@ typedef struct {
 } VerificationProof; // 20 + 307 + 20 + 16 + 138 + 128 + 231 + 45 = 905
 
 typedef struct {
+  Number ZTilde;
+  ResponseM mTilde[SIZE_L];
+  ResponseV vTilde; // 231
+  ResponseE eTilde; // 45
+  unsigned char rA[SIZE_R_A]; // 138
+  Number SRA;
+  Number modexpA;
+  Number modexpB;
+  Number AeTilde;
+  Number SvTilde;
+  Number SvAeTilde;
+  Number exp[6];
+  Number mul[6];
+} DebugData;
+
+typedef struct {
   ResponseM mHat[SIZE_L]; // 74*6 (444)
   AttributeMask disclose; // 2
 } VerificationSession; // 444 + 2 = 446

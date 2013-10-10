@@ -82,7 +82,8 @@ void FakeRandomBytes(unsigned char *buffer, unsigned int bytes) {
 
   // Generate the fake random number
   while (bytes > 0) {
-    *(--buffer) = bytes--;
+    *(--buffer) = 0xFF;
+    bytes--;
   }
 }
 

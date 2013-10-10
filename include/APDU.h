@@ -64,6 +64,7 @@
 #define INS_PROVE_COMMITMENT       0x2A
 #define INS_PROVE_SIGNATURE        0x2B
 #define INS_PROVE_ATTRIBUTE        0x2C
+#define INS_PROVE_DEBUG            0x2F
 
 #define INS_ADMIN_CREDENTIAL       0x30
 #define INS_ADMIN_REMOVE           0x31
@@ -97,6 +98,7 @@
 #define P1_SIGNATURE_A      0x01
 #define P1_SIGNATURE_E      0x02
 #define P1_SIGNATURE_V      0x03
+#define P1_SIGNATURE_ZTILDE 0x77
 
 #define P1_SIGNATURE_PROOF_C      0x04
 #define P1_SIGNATURE_PROOF_S_E    0x05
