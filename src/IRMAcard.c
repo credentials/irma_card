@@ -341,16 +341,19 @@ void processPINVerify(void) {
 void processPINChange(void) {
   debugMessage("INS_CHANGE_REFERENCE_DATA");
 
-  APDU_checkLength(2*SIZE_PIN_MAX);
   APDU_checkP1(0x00);
 
   switch (P2) {
     case P2_CARD_PIN:
+      APDU_checkLength(2*SIZE_PIN_MAX);
       debugMessage("Changing card administration PIN...");
       CHV_PIN_update(&cardPIN, Lc, public.apdu.data);
       break;
 
     case P2_CRED_PIN:
+      if (!CHV_verified(cardPIN)) {
+        APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
+      }
       debugMessage("Changing credential protection PIN...");
       CHV_PIN_update(&credPIN, Lc, public.apdu.data);
       break;

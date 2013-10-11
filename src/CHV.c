@@ -81,21 +81,24 @@ int CHV_PIN_verify(CHV_PIN *pin, unsigned int length, unsigned char *buffer) {
 int CHV_PIN_update(CHV_PIN *pin, unsigned int length, unsigned char *buffer) {
   int i;
 
-  // Verify the original PIN
-  i = CHV_PIN_verify(pin, CHV_PIN_SIZE, buffer);
-  if (i <= 0) {
-    return i;
+  if (length == 2*CHV_PIN_SIZE) {
+    // Verify the original PIN
+    i = CHV_PIN_verify(pin, CHV_PIN_SIZE, buffer);
+    if (i <= 0) {
+      return i;
+    }
+    buffer += CHV_PIN_SIZE;
   }
 
   // Verify the new PIN size
   for (i = 0; i < pin->minSize; i++) {
-    if (buffer[CHV_PIN_SIZE + i] == 0x00) {
+    if (buffer[i] == 0x00) {
       return CHV_WRONG_LENGTH;
     }
   }
 
   // Store the new code
-  CopyBytes(CHV_PIN_SIZE, pin->code, buffer + CHV_PIN_SIZE);
+  CopyBytes(CHV_PIN_SIZE, pin->code, buffer);
   pin->count = CHV_PIN_COUNT;
   return CHV_VALID;
 }
