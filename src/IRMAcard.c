@@ -20,10 +20,48 @@
  *   Pim Vullers <pim@cs.ru.nl>, Radboud University Nijmegen.
  */
 
-// Name everything "IRMAcard"
-#pragma attribute("aid", "49 52 4D 41 63 61 72 64")
-#pragma attribute("dir", "61 10 4f 6 69 64 65 6D 69 78 50 6 69 64 65 6D 69 78")
-#pragma attribute("fci", "6F 08 A5 06 04 04 49 00 07 03")
+/**
+ * Application Identifier (AID)
+ *
+ * 0xF8: 0xFX to indicate a Proprietary AID
+ * 0x49524D4163617264: ASCII encoded string "IRMAcard"
+ */
+#pragma attribute("aid", "F8 49 52 4D 41 63 61 72 64")
+
+/**
+ * DIR Record
+ *
+ * The DIR Record for a file contains information about the name of the
+ * application when loaded on the card. At application load time the content of
+ * the DIR record is entered into the smart card DIR File by MULTOS.
+ * DIR: DIRectory entry for the application list of the card
+ *
+ * 0x60 YZ: Application template (length: 0xYZ bytes)
+ *   0x4F YZ: Application identifier, AID (length: 0xYZ bytes)
+ *   0x50 YZ: Application label, human-readable identifier (length: 0xYZ bytes)
+ */
+#pragma attribute("dir", "61 15 4F 09 F8 49 52 4D 41 63 61 72 64 50 08 49 52 4D 41 63 61 72 64")
+
+/**
+ * FCI Record
+ *
+ * The File Control Information (FCI) Record contains the information that is
+ * returned when a MEL application is selected. MULTOS stores the FCI Record and
+ * returns the information if required during a Select File command.
+ *
+ * 0x6F YZ: FCI template (length: 0xYZ bytes)
+ *   0xA5 YZ: Proprietary information encoded in BER-TLV (length: 0xYZ bytes)
+ *     0x10 YZ: Sequence, version information (length: 0xYZ bytes)
+ *       0x02 01: Integer, major (length: 0x01 byte)
+ *       0x02 01: Integer, minor (length: 0x01 byte)
+ *       0x02 01: Integer, maintenance (optional, length: 0x01 byte)
+ *       0x02 01: Integer, build (optional, length: 0x01 byte)
+ *       0x10 YZ: Sequence, extra information (optional, length: 0xYZ bytes)
+ *         0x0C YZ: UTF-8 string, identifier (length: 0xYZ bytes)
+ *         0x02 01: Integer, counter (optional, length: 0x01 byte)
+ *         0x04 YZ: Octet string, data (optional, length: 0xYZ bytes)
+ */
+#pragma attribute("fci", "6F 16 A5 14 10 12 02 01 00 02 01 08 10 0A 0C 05 61 6C 70 68 61 02 01 00")
 
 #include "types.h"
 #include "types.debug.h"
@@ -126,6 +164,8 @@ IRMALogEntry *logEntry;
 /* APDU handling                                                    */
 /********************************************************************/
 
+void processPINVerify(void);
+void processPINChange(void);
 void processInitialisation(void);
 void processIssuance(void);
 void processVerification(void);
@@ -205,43 +245,13 @@ void main(void) {
         //////////////////////////////////////////////////////////////
 
         case INS_VERIFY:
-          debugMessage("INS_VERIFY");
-          APDU_checkLength(SIZE_PIN_MAX);
-          APDU_checkP1(0x00);
-
-          switch (P2) {
-            case P2_CARD_PIN:
-              CHV_PIN_verify(&cardPIN, public.apdu.data);
-              break;
-
-            case P2_CRED_PIN:
-              CHV_PIN_verify(&credPIN, public.apdu.data);
-              break;
-
-            default:
-              debugWarning("Unknown parameter");
-              APDU_returnSW(SW_WRONG_P1P2);
-          }
-          APDU_return();
+	        debugMessage("Processing PIN verification...");
+          processPINVerify();
+          SM_return();
 
         case INS_CHANGE_REFERENCE_DATA:
-          debugMessage("INS_CHANGE_REFERENCE_DATA");
-          APDU_checkLength(2*SIZE_PIN_MAX);
-          APDU_checkP1(0x00);
-
-          switch (P2) {
-            case P2_CARD_PIN:
-              CHV_PIN_update(&cardPIN, public.apdu.data);
-              break;
-
-            case P2_CRED_PIN:
-              CHV_PIN_update(&credPIN, public.apdu.data);
-              break;
-
-            default:
-              debugWarning("Unknown parameter");
-              APDU_returnSW(SW_WRONG_P1P2);
-          }
+          debugMessage("Processing PIN change...");
+          processPINChange();
           APDU_return();
 
         //////////////////////////////////////////////////////////////
@@ -260,17 +270,25 @@ void main(void) {
     case CLA_IRMACARD:
       switch (INS & 0xF0) {
         case 0x00:
+          debugMessage("Processing initialisation instruction...");
           processInitialisation();
           SM_return();
+
         case 0x10:
+          debugMessage("Processing issuance instruction...");
           processIssuance();
           SM_return();
+
         case 0x20:
+          debugMessage("Processing verification instruction...");
           processVerification();
           SM_return();
+
         case 0x30:
+          debugMessage("Processing administration instruction...");
           processAdministration();
           APDU_return();
+
         default:
           debugWarning("Unknown instruction");
           debugInteger("INS", INS);
@@ -288,6 +306,60 @@ void main(void) {
   }
 }
 
+void processPINVerify(void) {
+  int result;
+
+  debugMessage("INS_VERIFY");
+
+  APDU_checkP1(0x00);
+  switch (P2) {
+    case P2_CARD_PIN:
+      debugMessage("Verifying card administration PIN...");
+      result = CHV_PIN_verify(&cardPIN, Lc, public.apdu.data);
+      break;
+
+    case P2_CRED_PIN:
+      debugMessage("Verifying credential protection PIN...");
+      result = CHV_PIN_verify(&credPIN, Lc, public.apdu.data);
+      break;
+
+    default:
+      debugWarning("Unknown parameter");
+      APDU_returnSW(SW_WRONG_P1P2);
+  }
+
+  // Translate the result to the corresponding Status Word.
+  if (result == CHV_VALID) {
+    APDU_returnSW(SW_NO_ERROR);
+  } else if (result == CHV_WRONG_LENGTH) {
+    APDU_returnSW(SW_WRONG_LENGTH);
+  } else {
+    APDU_returnSW(SW_COUNTER(CHV_TRIES_LEFT * result));
+  }
+}
+
+void processPINChange(void) {
+  debugMessage("INS_CHANGE_REFERENCE_DATA");
+
+  APDU_checkLength(2*SIZE_PIN_MAX);
+  APDU_checkP1(0x00);
+
+  switch (P2) {
+    case P2_CARD_PIN:
+      debugMessage("Changing card administration PIN...");
+      CHV_PIN_update(&cardPIN, Lc, public.apdu.data);
+      break;
+
+    case P2_CRED_PIN:
+      debugMessage("Changing credential protection PIN...");
+      CHV_PIN_update(&credPIN, Lc, public.apdu.data);
+      break;
+
+    default:
+      debugWarning("Unknown parameter");
+      APDU_returnSW(SW_WRONG_P1P2);
+  }
+}
 
 void processInitialisation(void) {
   unsigned char flag;
@@ -362,6 +434,8 @@ void processInitialisation(void) {
 
 void startIssuance(void) {
   unsigned char i;
+
+  APDU_checkP1P2(0x0000);
 
   // Ensure that the master secret is initiaised
   IfZeroBytes(SIZE_M, masterSecret, RandomBits(masterSecret, LENGTH_M));
@@ -640,6 +714,8 @@ void processIssuance(void) {
 void startVerification(void) {
   unsigned char i;
 
+  APDU_checkP1P2(0x0000);
+
   // Start a new verification session
   credential = NULL;
   ClearBytes(sizeof(VerificationSession), &(session.prove));
@@ -807,6 +883,7 @@ void processAdministration(void) {
       if (!CheckCase(1)) {
         APDU_ReturnSW(SW_WRONG_LENGTH);
       }
+      APDU_checkP1P2(0x0000);
 
       for (i = 0; i < MAX_CRED; i++) {
         ((short*) public.apdu.data)[i] = credentials[i].id;
@@ -816,16 +893,13 @@ void processAdministration(void) {
 
     case INS_ADMIN_CREDENTIAL:
       debugMessage("INS_ADMIN_CREDENTIAL");
-      if (!CheckCase(1)) {
-        APDU_returnSW(SW_WRONG_LENGTH);
-      }
-      if (P1P2 == 0) {
-        APDU_returnSW(SW_WRONG_P1P2);
-      }
+
+      APDU_checkP1P2(0x0000);
+      APDU_checkLength(sizeof(AdminSelect));
 
       // Lookup the given credential ID and select it if it exists
       for (i = 0; i < MAX_CRED; i++) {
-        if (credentials[i].id == P1P2) {
+        if (credentials[i].id == public.adminSelect.id) {
           credential = &credentials[i];
           APDU_returnSW(SW_NO_ERROR);
         }
@@ -837,56 +911,47 @@ void processAdministration(void) {
       if (credential == NULL) {
         APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
       }
-      if (!CheckCase(1)) {
-        APDU_returnSW(SW_WRONG_LENGTH);
-      }
+
       if (P1 == 0 || P1 > credential->size) {
         APDU_returnSW(SW_WRONG_P1P2);
       }
+      APDU_checkP2(0x00);
+      APDU_checkLength(0);
 
       Copy(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
       debugValue("Returned attribute", public.apdu.data, SIZE_M);
       APDU_returnLa(SIZE_M);
-      break;
 
     case INS_ADMIN_REMOVE:
       debugMessage("INS_ADMIN_REMOVE");
       if (credential == NULL) {
         APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
       }
-      if (!((APDU_wrapped || CheckCase(1)) ||
-          ((APDU_wrapped || CheckCase(3)) && (Lc == SIZE_TIMESTAMP)))) {
-        APDU_returnSW(SW_WRONG_LENGTH);
-      }
-      if (P1P2 == 0) {
-        APDU_returnSW(SW_WRONG_P1P2);
-      }
 
-      // Verify the given credential ID and remove it if it matches
-      if (credential->id == P1P2) {
-        ClearCredential(credential);
-        debugInteger("Removed credential", P1P2);
+      APDU_checkP1P2(0x0000);
+      APDU_checkLength(sizeof(AdminRemove));
 
-        // Create new log entry
-        logEntry = (IRMALogEntry*) log_new_entry(&log);
-        Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.apdu.data);
-        Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
-        logEntry->action = ACTION_REMOVE;
-        logEntry->credential = P1P2;
+      debugInteger("Removing credential", credential->id);
+      ClearCredential(credential);
+      debugMessage("Removed credential");
 
-        APDU_return();
-      }
+      // Create new log entry
+      logEntry = (IRMALogEntry*) log_new_entry(&log);
+      Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.adminRemove.timestamp);
+      Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
+      logEntry->action = ACTION_REMOVE;
+      logEntry->credential = P1P2;
 
-      APDU_returnSW(SW_REFERENCED_DATA_NOT_FOUND);
+      APDU_return();
 
     case INS_ADMIN_FLAGS:
       debugMessage("INS_ADMIN_FLAGS");
       if (credential == NULL) {
         APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
       }
-      if (!(CheckCase(1) || (CheckCase(3) && (Lc == sizeof(CredentialFlags))))) {
-        APDU_returnSW(SW_WRONG_LENGTH);
-      }
+
+      APDU_checkP1P2(0x0000);
+      APDU_checkLength(sizeof(CredentialFlags));
 
       if (Lc > 0) {
         credential->userFlags = public.adminFlags.user;
@@ -901,9 +966,9 @@ void processAdministration(void) {
 
     case INS_ADMIN_LOG:
       debugMessage("INS_ADMIN_LOG");
-      if (!CheckCase(1)) {
-        APDU_returnSW(SW_WRONG_LENGTH);
-      }
+
+      APDU_checkP2(0x00);
+      APDU_checkLength(0);
 
       for (i = 0; i < 255 / sizeof(LogEntry); i++) {
         memcpy(public.apdu.data + i*sizeof(LogEntry), log_get_entry(&log, P1 + i), sizeof(LogEntry));

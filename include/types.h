@@ -195,6 +195,14 @@ typedef struct {
 } TerminalAuthentication;
 
 typedef struct {
+  CredentialIdentifier id;
+} AdminSelect;
+
+typedef struct {
+  unsigned char timestamp[SIZE_TIMESTAMP];
+} AdminRemove;
+
+typedef struct {
   CredentialFlags user;
   CredentialFlags issuer;
 } AdminFlags;
@@ -218,6 +226,8 @@ typedef union {
   VerificationSetup verificationSetup;
   VerificationProof prove;
 
+  AdminSelect adminSelect;
+  AdminRemove adminRemove;
   AdminFlags adminFlags;
 } PublicData;
 

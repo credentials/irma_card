@@ -44,11 +44,16 @@ typedef struct {
 } CHV_PIN;
 
 /**
+ * Query the PIN verification status
+ */
+int CHV_PIN_query(CHV_PIN *pin);
+
+/**
  * Verify a PIN code.
  *
  * @param buffer which contains the code to verify.
  */
-int CHV_PIN_verify(CHV_PIN* pin, unsigned char *buffer);
+int CHV_PIN_verify(CHV_PIN* pin, unsigned int length, unsigned char *buffer);
 
 #define CHV_BLOCKED 0
 #define CHV_TRIES_LEFT -1
@@ -60,7 +65,7 @@ int CHV_PIN_verify(CHV_PIN* pin, unsigned char *buffer);
  *
  * @param buffer which contains the old and new code.
  */
-int CHV_PIN_update(CHV_PIN* pin, unsigned char *buffer);
+int CHV_PIN_update(CHV_PIN* pin, unsigned int length, unsigned char *buffer);
 
 
 /**

@@ -105,7 +105,7 @@
  * Status Word bytes
  */
 #define SW_BYTES_REMAINING(SW2)           0x61##SW2
-#define SW_COUNTER_PROVIDED_BY_X(X)       0x63C##X
+#define SW_COUNTER(x)                     (0x63C0 | (x & 0x000F))
 #define SW_WRONG_LENGTH                   0x6700
 #define SW_FUNCTIONS_IN_CLA_NOT_SUPPORTED 0x6800
 #define SW_LOGICAL_CHANNEL_NOT_SUPPORTED  0x6881

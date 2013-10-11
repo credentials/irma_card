@@ -30,27 +30,47 @@ unsigned char CHV_flags;
 #pragma melstatic
 
 /**
+ * Query the PIN verification status
+ */
+int CHV_PIN_query(CHV_PIN *pin) {
+  if (CHV_verified(*pin)) {
+    return CHV_VALID;
+  } else {
+    return CHV_TRIES_LEFT * pin->count;
+  }
+}
+
+/**
  * Verify a PIN code.
  *
  * @param buffer which contains the code to verify.
  */
-int CHV_PIN_verify(CHV_PIN *pin, unsigned char *buffer) {
+int CHV_PIN_verify(CHV_PIN *pin, unsigned int length, unsigned char *buffer) {
   // Verify if the PIN has not been blocked
   if (pin->count == 0) {
     return CHV_BLOCKED;
   }
 
-  // Compare the PIN with the stored code
-  if (NotEqual(CHV_PIN_SIZE, buffer, pin->code)) {
-    debugWarning("PIN verification failed");
-    debugInteger("Tries left", pin->count - 1);
-    return CHV_TRIES_LEFT * --(pin->count);
-  } else {
-    debugMessage("PIN verified ");
-    pin->count = CHV_PIN_COUNT;
-    CHV_flags |= pin->flag;
-    return CHV_VALID;
+  // Check length of the provided data
+  if (length > 0) {
+    if (length != CHV_PIN_SIZE) {
+      return CHV_WRONG_LENGTH;
+    } else {
+
+      // Compare the PIN with the stored code
+      if (NotEqual(CHV_PIN_SIZE, buffer, pin->code)) {
+        debugWarning("PIN verification failed");
+        debugInteger("Tries left", pin->count - 1);
+        --(pin->count);
+      } else {
+        debugMessage("PIN verified");
+        pin->count = CHV_PIN_COUNT;
+        CHV_flags |= pin->flag;
+      }
+    }
   }
+
+  return CHV_PIN_query(pin);
 }
 
 /**
@@ -58,11 +78,11 @@ int CHV_PIN_verify(CHV_PIN *pin, unsigned char *buffer) {
  *
  * @param buffer which contains the old and new code
  */
-int CHV_PIN_update(CHV_PIN *pin, unsigned char *buffer) {
+int CHV_PIN_update(CHV_PIN *pin, unsigned int length, unsigned char *buffer) {
   int i;
 
   // Verify the original PIN
-  i = CHV_PIN_verify(pin, buffer);
+  i = CHV_PIN_verify(pin, CHV_PIN_SIZE, buffer);
   if (i <= 0) {
     return i;
   }
