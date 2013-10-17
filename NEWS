@@ -1,3 +1,9 @@
+*IRMAcard-0.8-alpha0 (11 October 2013)
+
+Rewrite of the application. AID and FCI are now ISO7816 compliant. CredentialID
+is now protected by secure messaging instead of stored in P1P2. Changed PIN 
+verification/modification.
+
 *idemix-0.7.2-2525d3c (19 April 2013)
 
 Bugfix which repairs the double verification issue.
