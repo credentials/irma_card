@@ -512,8 +512,6 @@ void processIssuance(void) {
 
     startIssuance();
 
-    APDU_return();
-
   // All other issuance commands
   } else {
 
@@ -780,8 +778,6 @@ void processVerification(void) {
     APDU_checkLength(sizeof(VerificationSetup));
 
     startVerification();
-
-    APDU_return();
 
   // All other verification commands
   } else {
