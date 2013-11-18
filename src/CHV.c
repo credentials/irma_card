@@ -62,6 +62,7 @@ int CHV_PIN_verify(CHV_PIN *pin, unsigned int length, unsigned char *buffer) {
         debugWarning("PIN verification failed");
         debugInteger("Tries left", pin->count - 1);
         --(pin->count);
+        CHV_flags &= (0xFF ^ pin->flag);
       } else {
         debugMessage("PIN verified");
         pin->count = CHV_PIN_COUNT;
