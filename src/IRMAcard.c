@@ -339,6 +339,8 @@ void processPINVerify(void) {
 }
 
 void processPINChange(void) {
+  int result;
+
   debugMessage("INS_CHANGE_REFERENCE_DATA");
 
   APDU_checkP1(0x00);
@@ -347,7 +349,7 @@ void processPINChange(void) {
     case P2_CARD_PIN:
       APDU_checkLength(2*SIZE_PIN_MAX);
       debugMessage("Changing card administration PIN...");
-      CHV_PIN_update(&cardPIN, Lc, public.apdu.data);
+      result = CHV_PIN_update(&cardPIN, Lc, public.apdu.data);
       break;
 
     case P2_CRED_PIN:
@@ -355,12 +357,21 @@ void processPINChange(void) {
         APDU_returnSW(SW_SECURITY_STATUS_NOT_SATISFIED);
       }
       debugMessage("Changing credential protection PIN...");
-      CHV_PIN_update(&credPIN, Lc, public.apdu.data);
+      result = CHV_PIN_update(&credPIN, Lc, public.apdu.data);
       break;
 
     default:
       debugWarning("Unknown parameter");
       APDU_returnSW(SW_WRONG_P1P2);
+  }
+
+  // Translate the result to the corresponding Status Word.
+  if (result == CHV_VALID) {
+    APDU_returnSW(SW_NO_ERROR);
+  } else if (result == CHV_WRONG_LENGTH) {
+    APDU_returnSW(SW_WRONG_LENGTH);
+  } else {
+    APDU_returnSW(SW_COUNTER(CHV_TRIES_LEFT * result));
   }
 }
 
