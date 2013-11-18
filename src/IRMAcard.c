@@ -252,7 +252,7 @@ void main(void) {
         case INS_CHANGE_REFERENCE_DATA:
           debugMessage("Processing PIN change...");
           processPINChange();
-          APDU_return();
+          return;
 
         //////////////////////////////////////////////////////////////
         // Unknown instruction byte (INS)                           //
@@ -287,7 +287,7 @@ void main(void) {
         case 0x30:
           debugMessage("Processing administration instruction...");
           processAdministration();
-          APDU_return();
+          return;
 
         default:
           debugWarning("Unknown instruction");
