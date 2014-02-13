@@ -52,10 +52,6 @@ do { \
   __code(PRIM, PRIM_MODULAR_MULTIPLICATION); \
 } while (0)
 
-#ifdef SIMULATOR
-#undef RSA_VERIFY
-#endif
-
 #ifdef RSA_VERIFY
 
 #define ModExp(ExponentLength, ModulusLength, Exponent, Modulus, Base, Result) \
