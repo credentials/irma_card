@@ -253,6 +253,9 @@ void main(void) {
           SM_return();
 
         case INS_CHANGE_REFERENCE_DATA:
+          if (!CheckCase(3)) {
+            APDU_returnSW(SW_WRONG_LENGTH);
+          }
           debugMessage("Processing PIN change...");
           processPINChange();
           return;
@@ -454,6 +457,11 @@ void startIssuance(void) {
 
   APDU_checkP1P2(0x0000);
 
+  if (!(APDU_wrapped || CheckCase(3))) {
+    APDU_ReturnSW(SW_WRONG_LENGTH);
+  }
+  APDU_checkLength(sizeof(IssuanceSetup));
+
   // Ensure that the master secret is initiaised
   IfZeroBytes(SIZE_M, masterSecret, RandomBits(masterSecret, LENGTH_M));
 
@@ -522,7 +530,6 @@ void processIssuance(void) {
   // Special case: start issuance
   if (INS == INS_ISSUE_CREDENTIAL) {
     debugMessage("INS_ISSUE_CREDENTIAL");
-    APDU_checkLength(sizeof(IssuanceSetup));
 
     startIssuance();
 
@@ -541,6 +548,9 @@ void processIssuance(void) {
           nextState();
         }
         checkState(STATE_ISSUE_PUBLIC_KEY);
+        if (!(APDU_wrapped || CheckCase(3))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
         APDU_checkLength(SIZE_N);
 
         switch (P1) {
@@ -584,6 +594,9 @@ void processIssuance(void) {
           nextState();
         }
         checkState(STATE_ISSUE_ATTRIBUTES);
+        if (!(APDU_wrapped || CheckCase(3))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
         APDU_checkLength(SIZE_M);
         APDU_checkP1range(1, credential->size);
         IfZero(SIZE_M, public.apdu.data,
@@ -600,6 +613,9 @@ void processIssuance(void) {
         if (!matchState(STATE_ISSUE_ATTRIBUTES) && !issuance_checkAttributes(credential)) {
           APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
         }
+        if (!(APDU_wrapped || CheckCase(3))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
         APDU_checkLength(SIZE_STATZK);
 
         Copy(SIZE_STATZK, public.issue.nonce, public.apdu.data);
@@ -613,6 +629,9 @@ void processIssuance(void) {
       case INS_ISSUE_COMMITMENT_PROOF:
         debugMessage("INS_ISSUE_COMMITMENT_PROOF");
         checkState(STATE_ISSUE_COMMITTED);
+        if (!(APDU_wrapped || CheckCase(1))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
         APDU_checkLength(0);
 
         switch (P1) {
@@ -643,6 +662,9 @@ void processIssuance(void) {
       case INS_ISSUE_CHALLENGE:
         debugMessage("INS_ISSUE_CHALLENGE");
         checkState(STATE_ISSUE_COMMITTED);
+        if (!(APDU_wrapped || CheckCase(1))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
         APDU_checkLength(0);
 
         Copy(SIZE_STATZK, public.apdu.data, credential->proof.nonce);
@@ -657,6 +679,9 @@ void processIssuance(void) {
           nextState();
         }
         checkState(STATE_ISSUE_SIGNATURE);
+        if (!(APDU_wrapped || CheckCase(3))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
 
         switch(P1) {
           case P1_SIGNATURE_A:
@@ -705,6 +730,9 @@ void processIssuance(void) {
           nextState();
         }
         checkState(STATE_ISSUE_VERIFY);
+        if (!(APDU_wrapped || CheckCase(1))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
 
         if (!verifySignature(credential, &masterSecret[0], &session.vfySig)) {
           debugWarning("Signature invalid");
@@ -1004,4 +1032,3 @@ void processAdministration(void) {
       break;
   }
 }
-
