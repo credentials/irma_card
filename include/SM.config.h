@@ -32,8 +32,8 @@
  * Define either SM_AES or SM_DES to use defaults, otherwise specify the
  * custom configuration in the first block
  */
-#define SM_AES
-//#define SM_DES
+//#define SM_AES
+#define SM_DES
 
 #ifndef SM_AES
 #ifndef SM_DES
@@ -80,3 +80,4 @@
 #endif // !SM_AES
 
 #endif // __SM_config_H
+
