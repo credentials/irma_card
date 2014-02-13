@@ -245,6 +245,9 @@ void main(void) {
         //////////////////////////////////////////////////////////////
 
         case INS_VERIFY:
+          if (!CheckCase(3)) {
+            APDU_returnSW(SW_WRONG_LENGTH);
+          }
 	        debugMessage("Processing PIN verification...");
           processPINVerify();
           SM_return();
@@ -1001,3 +1004,4 @@ void processAdministration(void) {
       break;
   }
 }
+
