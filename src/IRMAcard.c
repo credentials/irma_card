@@ -759,6 +759,11 @@ void startVerification(void) {
 
   APDU_checkP1P2(0x0000);
 
+  if (!(APDU_wrapped || CheckCase(3))) {
+    APDU_ReturnSW(SW_WRONG_LENGTH);
+  }
+  APDU_checkLength(sizeof(VerificationSetup));
+
   // Start a new verification session
   credential = NULL;
   ClearBytes(sizeof(VerificationSession), &(session.prove));
@@ -817,7 +822,6 @@ void processVerification(void) {
   // Special case: start verification
   if (INS == INS_PROVE_CREDENTIAL) {
     debugMessage("INS_PROVE_CREDENTIAL");
-    APDU_checkLength(sizeof(VerificationSetup));
 
     startVerification();
 
@@ -833,6 +837,9 @@ void processVerification(void) {
       case INS_PROVE_COMMITMENT:
         debugMessage("INS_PROVE_COMMITMENT");
         checkState(STATE_PROVE_SETUP);
+        if (!(APDU_wrapped || CheckCase(3))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
         APDU_checkLength(SIZE_STATZK);
 
         constructProof(credential, &masterSecret[0]);
@@ -845,6 +852,9 @@ void processVerification(void) {
         debugMessage("INS_PROVE_SIGNATURE");
         if (matchState(STATE_PROVE_COMMITTED)) {
           nextState();
+        }
+        if (!(APDU_wrapped || CheckCase(3))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
         }
         checkState(STATE_PROVE_SIGNATURE);
 
@@ -890,6 +900,9 @@ void processVerification(void) {
           nextState();
         }
         checkState(STATE_PROVE_ATTRIBUTES);
+        if (!(APDU_wrapped || CheckCase(1))) {
+          APDU_ReturnSW(SW_WRONG_LENGTH);
+        }
         APDU_checkLength(0);
         if (P1 > credential->size) {
           APDU_returnSW(SW_WRONG_P1P2);
@@ -936,6 +949,9 @@ void processAdministration(void) {
       debugMessage("INS_ADMIN_CREDENTIAL");
 
       APDU_checkP1P2(0x0000);
+      if (!CheckCase(3)) {
+        APDU_ReturnSW(SW_WRONG_LENGTH);
+      }
       APDU_checkLength(sizeof(AdminSelect));
 
       // Lookup the given credential ID and select it if it exists
@@ -957,6 +973,9 @@ void processAdministration(void) {
         APDU_returnSW(SW_WRONG_P1P2);
       }
       APDU_checkP2(0x00);
+      if (!CheckCase(1)) {
+        APDU_ReturnSW(SW_WRONG_LENGTH);
+      }
       APDU_checkLength(0);
 
       Copy(SIZE_M, public.apdu.data, credential->attribute[P1 - 1]);
@@ -970,6 +989,9 @@ void processAdministration(void) {
       }
 
       APDU_checkP1P2(0x0000);
+      if (!CheckCase(3)) {
+        APDU_ReturnSW(SW_WRONG_LENGTH);
+      }
       APDU_checkLength(sizeof(AdminRemove));
 
       debugInteger("Removing credential", credential->id);
@@ -992,6 +1014,9 @@ void processAdministration(void) {
       }
 
       APDU_checkP1P2(0x0000);
+      if (!CheckCase(3)) {
+        APDU_ReturnSW(SW_WRONG_LENGTH);
+      }
       APDU_checkLength(sizeof(CredentialFlags));
 
       if (Lc > 0) {
@@ -1009,6 +1034,9 @@ void processAdministration(void) {
       debugMessage("INS_ADMIN_LOG");
 
       APDU_checkP2(0x00);
+      if (!CheckCase(1)) {
+        APDU_ReturnSW(SW_WRONG_LENGTH);
+      }
       APDU_checkLength(0);
 
       for (i = 0; i < 255 / sizeof(LogEntry); i++) {
