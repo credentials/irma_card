@@ -853,38 +853,27 @@ void processVerification(void) {
         if (matchState(STATE_PROVE_COMMITTED)) {
           nextState();
         }
-        if (!(APDU_wrapped || CheckCase(3))) {
-          APDU_ReturnSW(SW_WRONG_LENGTH);
-        }
         checkState(STATE_PROVE_SIGNATURE);
+        if (!(APDU_wrapped || CheckCase(1))) {
+          APDU_returnSW(SW_WRONG_LENGTH);
+        }
+        APDU_checkLength(0);
 
         switch(P1) {
           case P1_SIGNATURE_A:
             debugMessage("P1_SIGNATURE_A");
-            if (!(APDU_wrapped || CheckCase(1))) {
-              APDU_returnSW(SW_WRONG_LENGTH);
-            }
-
             Copy(SIZE_N, public.apdu.data, public.prove.APrime);
             debugNumber("Returned A'", public.apdu.data);
             APDU_returnLa(SIZE_N);
 
           case P1_SIGNATURE_E:
             debugMessage("P1_SIGNATURE_E");
-            if (!(APDU_wrapped || CheckCase(1))) {
-              APDU_returnSW(SW_WRONG_LENGTH);
-            }
-
             Copy(SIZE_E_, public.apdu.data, public.prove.eHat);
             debugValue("Returned e^", public.apdu.data, SIZE_E_);
             APDU_returnLa(SIZE_E_);
 
           case P1_SIGNATURE_V:
             debugMessage("P1_SIGNATURE_V");
-            if (!(APDU_wrapped || CheckCase(1))) {
-              APDU_returnSW(SW_WRONG_LENGTH);
-            }
-
             Copy(SIZE_V_, public.apdu.data, public.prove.vHat);
             debugValue("Returned v^", public.apdu.data, SIZE_V_);
             APDU_returnLa(SIZE_V_);
