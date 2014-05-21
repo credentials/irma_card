@@ -42,7 +42,7 @@ from http://www.multos.com/uploads/MUtil.zip.
 
 In order to load an application in the card we must first copy the AID into MUtil. In the case
 of IRMA this is specified in the .aif file of the card/ directory for the last available version.
-Moreover, we must include the RAM space that will be reserved for session data in the application(Section 2).
+Moreover, we must include the RAM space that will be reserved for session data in the application (Section 2).
 
 #### 4. Using your IRMA card
 
