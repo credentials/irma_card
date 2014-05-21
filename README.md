@@ -47,7 +47,7 @@ Moreover, we must include the RAM space that will be reserved for session data i
 #### 4. Using your IRMA card
 
 The first you thing you can do is to change your credential and administration PINs using
-[https://github.com/credentials/silvia](Silvia). Then, you can generate an issuer keypair and
+[silvia](https://github.com/credentials/silvia). Then, you can generate an issuer keypair and
 start issuing and verifying credentials using the examples from https://github.com/credentials/irma_configuration or create your own credentials.
 
 #### 5. References
