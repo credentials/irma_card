@@ -983,16 +983,16 @@ void processAdministration(void) {
       }
       APDU_checkLength(sizeof(AdminRemove));
 
-      debugInteger("Removing credential", credential->id);
-      ClearCredential(credential);
-      debugMessage("Removed credential");
-
       // Create new log entry
       logEntry = (IRMALogEntry*) log_new_entry(&log);
       Copy(SIZE_TIMESTAMP, logEntry->timestamp, public.adminRemove.timestamp);
       Copy(AUTH_TERMINAL_ID_BYTES, logEntry->terminal, terminal.id);
       logEntry->action = ACTION_REMOVE;
-      logEntry->credential = P1P2;
+      logEntry->credential = credential->id;
+
+      debugInteger("Removing credential", credential->id);
+      ClearCredential(credential);
+      debugMessage("Removed credential");
 
       APDU_return();
 
