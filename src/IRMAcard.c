@@ -958,8 +958,11 @@ void processAdministration(void) {
         APDU_returnSW(SW_CONDITIONS_NOT_SATISFIED);
       }
 
-      if (P1 == 0 || P1 > credential->size) {
+      if (P1 == 0) {
         APDU_returnSW(SW_WRONG_P1P2);
+      }
+      else if(P1 > credential->size) {
+        APDU_returnSW(SW_RECORD_NOT_FOUND);
       }
       APDU_checkP2(0x00);
       if (!CheckCase(1)) {
